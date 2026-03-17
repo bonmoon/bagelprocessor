@@ -1,0 +1,1607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workbook Operations Hub</title>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
+
+        :root {
+            --bg: #f3efe6;
+            --bg-strong: #eadfcb;
+            --surface: rgba(255, 252, 247, 0.82);
+            --surface-strong: rgba(255, 255, 255, 0.92);
+            --line: rgba(76, 57, 34, 0.12);
+            --text: #2f2519;
+            --muted: #6f6151;
+            --accent: #1f6a5d;
+            --accent-strong: #114f45;
+            --accent-soft: rgba(31, 106, 93, 0.12);
+            --gold: #c89234;
+            --error: #b74d34;
+            --success: #1e7a4d;
+            --shadow: 0 24px 60px rgba(62, 42, 16, 0.12);
+            --radius-xl: 28px;
+            --radius-lg: 22px;
+            --radius-md: 16px;
+            --radius-sm: 12px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Manrope', sans-serif;
+            background:
+                radial-gradient(circle at top left, rgba(200, 146, 52, 0.12), transparent 30%),
+                radial-gradient(circle at top right, rgba(31, 106, 93, 0.14), transparent 32%),
+                linear-gradient(180deg, #f7f3ea 0%, #f0eadf 100%);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.25) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.25) 1px, transparent 1px);
+            background-size: 48px 48px;
+            opacity: 0.22;
+        }
+
+        .shell {
+            width: min(1240px, calc(100% - 32px));
+            margin: 24px auto 48px;
+        }
+
+        .hero {
+            position: relative;
+            overflow: hidden;
+            padding: 36px;
+            border-radius: 32px;
+            border: 1px solid rgba(255, 255, 255, 0.55);
+            background:
+                linear-gradient(135deg, rgba(30, 54, 49, 0.92), rgba(80, 58, 32, 0.82)),
+                url('Assets/1.png') center/cover;
+            box-shadow: var(--shadow);
+            color: #fff9f1;
+            isolation: isolate;
+        }
+
+        .hero::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background:
+                linear-gradient(140deg, rgba(255, 255, 255, 0.12), transparent 36%),
+                linear-gradient(180deg, rgba(15, 26, 24, 0.06), rgba(15, 26, 24, 0.34));
+            z-index: -1;
+        }
+
+        .hero-top {
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+            align-items: flex-start;
+            margin-bottom: 26px;
+        }
+
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            border-radius: 999px;
+            background: rgba(255, 249, 241, 0.14);
+            border: 1px solid rgba(255, 249, 241, 0.22);
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .hero h1 {
+            font-size: clamp(2.4rem, 4vw, 4.2rem);
+            line-height: 0.96;
+            max-width: 760px;
+            margin: 18px 0 16px;
+        }
+
+        .hero p {
+            max-width: 680px;
+            font-size: 1rem;
+            line-height: 1.7;
+            color: rgba(255, 249, 241, 0.82);
+        }
+
+        .hero-meta {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 24px;
+        }
+
+        .meta-pill {
+            padding: 10px 14px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            font-size: 13px;
+            color: #fff6ea;
+        }
+
+        .hero-side {
+            min-width: 260px;
+            display: grid;
+            gap: 12px;
+        }
+
+        .hero-side-card {
+            padding: 16px 18px;
+            border-radius: 18px;
+            background: rgba(255, 252, 247, 0.1);
+            border: 1px solid rgba(255, 252, 247, 0.18);
+            backdrop-filter: blur(8px);
+        }
+
+        .hero-side-card strong {
+            display: block;
+            font-size: 15px;
+            margin-bottom: 6px;
+        }
+
+        .hero-side-card span {
+            font-size: 13px;
+            color: rgba(255, 249, 241, 0.78);
+            line-height: 1.6;
+        }
+
+        .guide {
+            margin-top: 24px;
+            padding: 28px;
+            border-radius: var(--radius-xl);
+            background: var(--surface);
+            border: 1px solid rgba(255, 255, 255, 0.65);
+            backdrop-filter: blur(10px);
+            box-shadow: var(--shadow);
+        }
+
+        .section-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            align-items: flex-end;
+            margin-bottom: 22px;
+        }
+
+        .section-head h2 {
+            font-size: 1.7rem;
+            margin-bottom: 6px;
+        }
+
+        .section-head p {
+            color: var(--muted);
+            line-height: 1.7;
+        }
+
+        .guide-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 16px;
+        }
+
+        .guide-step {
+            padding: 18px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.62);
+            border: 1px solid rgba(76, 57, 34, 0.08);
+        }
+
+        .guide-step span {
+            display: inline-flex;
+            width: 34px;
+            height: 34px;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            background: var(--accent-soft);
+            color: var(--accent);
+            font-weight: 800;
+            margin-bottom: 12px;
+        }
+
+        .guide-step h3 {
+            font-size: 1rem;
+            margin-bottom: 8px;
+        }
+
+        .guide-step p {
+            color: var(--muted);
+            font-size: 14px;
+            line-height: 1.7;
+        }
+
+        .modules {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 20px;
+            margin-top: 24px;
+        }
+
+        .module-card {
+            position: relative;
+            overflow: hidden;
+            border-radius: var(--radius-xl);
+            border: 1px solid rgba(255, 255, 255, 0.65);
+            background: var(--surface);
+            backdrop-filter: blur(14px);
+            box-shadow: var(--shadow);
+            min-height: 100%;
+        }
+
+        .module-card::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background-size: cover;
+            background-position: center;
+            opacity: 0.14;
+            mix-blend-mode: multiply;
+        }
+
+        .module-card::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.68));
+            pointer-events: none;
+        }
+
+        .module-card[data-asset="1"]::before { background-image: url('Assets/1.png'); }
+        .module-card[data-asset="2"]::before { background-image: url('Assets/2.png'); }
+        .module-card[data-asset="3"]::before { background-image: url('Assets/3.png'); }
+        .module-card[data-asset="4"]::before { background-image: url('Assets/4.png'); }
+
+        .module-inner {
+            position: relative;
+            z-index: 1;
+            padding: 26px;
+        }
+
+        .module-top {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            align-items: flex-start;
+            margin-bottom: 18px;
+        }
+
+        .module-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            background: rgba(255, 255, 255, 0.72);
+            color: var(--accent);
+            border: 1px solid rgba(31, 106, 93, 0.12);
+        }
+
+        .module-title {
+            font-size: 1.45rem;
+            margin: 14px 0 8px;
+        }
+
+        .module-copy {
+            color: var(--muted);
+            line-height: 1.75;
+            margin-bottom: 18px;
+        }
+
+        .feature-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 18px;
+        }
+
+        .feature-badge {
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.78);
+            border: 1px solid rgba(76, 57, 34, 0.08);
+            font-size: 12px;
+            color: var(--text);
+        }
+
+        .panel {
+            padding: 18px;
+            border-radius: var(--radius-lg);
+            background: var(--surface-strong);
+            border: 1px solid rgba(76, 57, 34, 0.08);
+        }
+
+        .field-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .field,
+        .field-full {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .field-full {
+            grid-column: 1 / -1;
+        }
+
+        label {
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+
+        input[type="text"],
+        input[type="file"],
+        .selector-trigger,
+        .search-input {
+            width: 100%;
+            border: 1px solid rgba(76, 57, 34, 0.14);
+            background: #fffdf9;
+            border-radius: 14px;
+            padding: 14px 16px;
+            font: inherit;
+            color: var(--text);
+        }
+
+        input[type="file"]::file-selector-button {
+            border: none;
+            background: var(--accent);
+            color: white;
+            padding: 10px 14px;
+            border-radius: 10px;
+            margin-right: 12px;
+            font: inherit;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        input[type="text"]:focus,
+        .selector-trigger:focus,
+        .search-input:focus {
+            outline: 2px solid rgba(31, 106, 93, 0.2);
+            border-color: rgba(31, 106, 93, 0.45);
+        }
+
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 18px;
+        }
+
+        button {
+            border: none;
+            cursor: pointer;
+            font: inherit;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 18px;
+            border-radius: 14px;
+            background: #efe7d7;
+            color: var(--text);
+            font-weight: 700;
+            transition: transform 0.18s ease, background 0.18s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            background: #e8deca;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-strong);
+        }
+
+        .status {
+            display: none;
+            margin-top: 16px;
+            padding: 14px 16px;
+            border-radius: 16px;
+            line-height: 1.6;
+            font-size: 14px;
+        }
+
+        .status.show {
+            display: block;
+        }
+
+        .status.loading {
+            background: rgba(31, 106, 93, 0.1);
+            color: var(--accent-strong);
+            border: 1px solid rgba(31, 106, 93, 0.18);
+        }
+
+        .status.success {
+            background: rgba(30, 122, 77, 0.1);
+            color: var(--success);
+            border: 1px solid rgba(30, 122, 77, 0.18);
+        }
+
+        .status.error {
+            background: rgba(183, 77, 52, 0.1);
+            color: var(--error);
+            border: 1px solid rgba(183, 77, 52, 0.18);
+        }
+
+        .preview {
+            display: none;
+            margin-top: 16px;
+            padding: 16px;
+            border-radius: 18px;
+            background: rgba(249, 246, 239, 0.92);
+            border: 1px solid rgba(76, 57, 34, 0.08);
+            max-height: 320px;
+            overflow: auto;
+            font-size: 13px;
+        }
+
+        .preview.show {
+            display: block;
+        }
+
+        .preview-title {
+            font-size: 14px;
+            font-weight: 800;
+            margin-bottom: 10px;
+        }
+
+        .preview-row {
+            padding: 10px 12px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.72);
+            border: 1px solid rgba(76, 57, 34, 0.06);
+            margin-bottom: 8px;
+            line-height: 1.6;
+        }
+
+        .preview-row strong {
+            color: var(--accent-strong);
+        }
+
+        .helper-text {
+            font-size: 13px;
+            color: var(--muted);
+            line-height: 1.7;
+        }
+
+        .selector {
+            position: relative;
+        }
+
+        .selector-trigger {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            text-align: left;
+            min-height: 54px;
+        }
+
+        .selector-trigger span:last-child {
+            color: var(--muted);
+        }
+
+        .selector-panel {
+            position: absolute;
+            top: calc(100% + 8px);
+            left: 0;
+            right: 0;
+            display: none;
+            padding: 14px;
+            border-radius: 18px;
+            background: #fffdf8;
+            border: 1px solid rgba(76, 57, 34, 0.12);
+            box-shadow: 0 18px 40px rgba(51, 35, 13, 0.12);
+            z-index: 20;
+        }
+
+        .selector-panel.open {
+            display: block;
+        }
+
+        .selector-toolbar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .selector-toolbar button {
+            padding: 8px 10px;
+            border-radius: 10px;
+            background: #f1eadb;
+            color: var(--text);
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .option-list {
+            max-height: 220px;
+            overflow: auto;
+            display: grid;
+            gap: 8px;
+        }
+
+        .option-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 12px;
+            background: rgba(245, 240, 230, 0.8);
+        }
+
+        .option-item input {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--accent);
+        }
+
+        .chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 10px;
+            border-radius: 999px;
+            background: rgba(31, 106, 93, 0.1);
+            color: var(--accent-strong);
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .chip button {
+            background: transparent;
+            color: inherit;
+            padding: 0;
+            font-size: 12px;
+        }
+
+        .mini-stats {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+            margin-top: 14px;
+        }
+
+        .mini-stat {
+            padding: 12px 14px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.76);
+            border: 1px solid rgba(76, 57, 34, 0.06);
+        }
+
+        .mini-stat strong {
+            display: block;
+            font-size: 1.1rem;
+            margin-bottom: 4px;
+        }
+
+        .mini-stat span {
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        footer {
+            margin-top: 28px;
+            padding: 18px 6px 8px;
+            text-align: center;
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        @media (max-width: 1080px) {
+            .guide-grid,
+            .modules,
+            .field-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .hero-top,
+            .section-head {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .hero-side {
+                width: 100%;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 720px) {
+            .shell {
+                width: min(100% - 18px, 100%);
+                margin: 10px auto 28px;
+            }
+
+            .hero,
+            .guide,
+            .module-inner {
+                padding: 20px;
+            }
+
+            .hero-side {
+                grid-template-columns: 1fr;
+            }
+
+            .actions {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+            }
+
+            .mini-stats {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="shell">
+        <section class="hero">
+            <div class="hero-top">
+                <div>
+                    <div class="eyebrow">Browser-first workbook operations</div>
+                    <h1>Clean, filter, combine, and split spreadsheet data in one workspace.</h1>
+                    <p>
+                        A production-ready static tool for Excel workflows. Upload a file, preview the result,
+                        then export a polished workbook directly in the browser.
+                    </p>
+                    <div class="hero-meta">
+                        <div class="meta-pill">Static app for Vercel</div>
+                        <div class="meta-pill">No backend required</div>
+                        <div class="meta-pill">Multi-category filtering</div>
+                    </div>
+                </div>
+                <div class="hero-side">
+                    <div class="hero-side-card">
+                        <strong>What is included</strong>
+                        <span>4 workflow modules, export styling, category path generation, and guided in-app instructions.</span>
+                    </div>
+                    <div class="hero-side-card">
+                        <strong>Category update workflow</strong>
+                        <span>Select multiple category nodes at once, then prepend a new top-level category for matched rows.</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="guide">
+            <div class="section-head">
+                <div>
+                    <h2>User Guide</h2>
+                    <p>Use the same file directly in the browser. Every module supports upload, preview, and export without exposing any customer-specific labels in the interface.</p>
+                </div>
+            </div>
+            <div class="guide-grid">
+                <article class="guide-step">
+                    <span>1</span>
+                    <h3>Upload the source workbook</h3>
+                    <p>Each module reads the relevant sheet automatically. If a category or product sheet is available, the tool will prioritize it.</p>
+                </article>
+                <article class="guide-step">
+                    <span>2</span>
+                    <h3>Preview before export</h3>
+                    <p>Use the preview action to verify matched rows, combined category paths, and cleaned columns before downloading a new workbook.</p>
+                </article>
+                <article class="guide-step">
+                    <span>3</span>
+                    <h3>Filter multiple category nodes</h3>
+                    <p>In the category filter module, select one or many category values from the list. Rows are kept when any selected value appears in the category hierarchy.</p>
+                </article>
+                <article class="guide-step">
+                    <span>4</span>
+                    <h3>Apply hierarchy updates</h3>
+                    <p>Optionally add a new top-level category. The output includes a <strong>Combined Category</strong> column such as <strong>H *** A *** B *** C</strong>.</p>
+                </article>
+            </div>
+        </section>
+
+        <section class="modules">
+            <article class="module-card" data-asset="1">
+                <div class="module-inner">
+                    <div class="module-top">
+                        <div>
+                            <div class="module-tag">Module 01</div>
+                            <h2 class="module-title">Category Hierarchy Formatter</h2>
+                        </div>
+                    </div>
+                    <p class="module-copy">Extract category hierarchy columns, combine them with the required separator, and export a clean single-column output.</p>
+                    <div class="feature-list">
+                        <div class="feature-badge">Auto sheet detection</div>
+                        <div class="feature-badge">Preview first rows</div>
+                        <div class="feature-badge">Styled workbook export</div>
+                    </div>
+                    <div class="panel">
+                        <div class="field-full">
+                            <label for="categoriesFile">Workbook</label>
+                            <input type="file" id="categoriesFile" accept=".xlsx,.xls">
+                        </div>
+                        <div class="actions">
+                            <button class="btn btn-primary" onclick="processCategoriesHierarchy()">Export Combined Categories</button>
+                            <button class="btn" onclick="previewCategories()">Preview</button>
+                        </div>
+                        <div id="statusCategories" class="status"></div>
+                        <div id="previewCategories" class="preview"></div>
+                    </div>
+                </div>
+            </article>
+
+            <article class="module-card" data-asset="2">
+                <div class="module-inner">
+                    <div class="module-top">
+                        <div>
+                            <div class="module-tag">Module 02</div>
+                            <h2 class="module-title">Category Filter and Hierarchy Update</h2>
+                        </div>
+                    </div>
+                    <p class="module-copy">Filter products by multiple category nodes at once, then optionally prepend a new top-level category and export the updated combined path.</p>
+                    <div class="feature-list">
+                        <div class="feature-badge">Multi-select category filter</div>
+                        <div class="feature-badge">Combined Category column</div>
+                        <div class="feature-badge">Top-level prepend support</div>
+                    </div>
+                    <div class="panel">
+                        <div class="field-grid">
+                            <div class="field-full">
+                                <label for="categoryFilterFile">Workbook</label>
+                                <input type="file" id="categoryFilterFile" accept=".xlsx,.xls">
+                            </div>
+                            <div class="field-full">
+                                <label>Category nodes</label>
+                                <div class="selector" id="categorySelector">
+                                    <button type="button" class="selector-trigger" id="categorySelectorTrigger">
+                                        <span id="categorySelectorLabel">Upload a workbook to load category options</span>
+                                        <span>Open</span>
+                                    </button>
+                                    <div class="selector-panel" id="categorySelectorPanel">
+                                        <input type="text" id="categorySearch" class="search-input" placeholder="Search category values">
+                                        <div class="selector-toolbar">
+                                            <button type="button" onclick="selectAllCategoryOptions()">Select all</button>
+                                            <button type="button" onclick="clearCategoryOptions()">Clear</button>
+                                        </div>
+                                        <div class="option-list" id="categoryOptions"></div>
+                                    </div>
+                                </div>
+                                <div class="chips" id="categorySelectedChips"></div>
+                            </div>
+                            <div class="field">
+                                <label for="prependCategoryInput">New top-level category</label>
+                                <input type="text" id="prependCategoryInput" placeholder="Optional, for example H">
+                            </div>
+                            <div class="field">
+                                <label for="categorySeparatorInput">Combined separator</label>
+                                <input type="text" id="categorySeparatorInput" value=" *** ">
+                            </div>
+                        </div>
+                        <p class="helper-text" style="margin-top: 12px;">
+                            Matching logic checks every column whose header contains <strong>Category</strong> or <strong>Level</strong>.
+                            A row is included when any selected value appears at any category layer.
+                        </p>
+                        <div class="mini-stats">
+                            <div class="mini-stat">
+                                <strong id="categoryOptionCount">0</strong>
+                                <span>category values loaded</span>
+                            </div>
+                            <div class="mini-stat">
+                                <strong id="categorySelectedCount">0</strong>
+                                <span>selected for filtering</span>
+                            </div>
+                            <div class="mini-stat">
+                                <strong id="categoryMatchedCount">0</strong>
+                                <span>rows in latest preview</span>
+                            </div>
+                        </div>
+                        <div class="actions">
+                            <button class="btn btn-primary" onclick="processCategoryFilter()">Filter and Export</button>
+                            <button class="btn" onclick="previewCategoryFilter()">Preview Matches</button>
+                        </div>
+                        <div id="statusCategoryFilter" class="status"></div>
+                        <div id="previewCategoryFilter" class="preview"></div>
+                    </div>
+                </div>
+            </article>
+
+            <article class="module-card" data-asset="3">
+                <div class="module-inner">
+                    <div class="module-top">
+                        <div>
+                            <div class="module-tag">Module 03</div>
+                            <h2 class="module-title">Master List Cleanup</h2>
+                        </div>
+                    </div>
+                    <p class="module-copy">Remove unused fields, normalize headers, and keep only rows that contain actionable RPC or URL data.</p>
+                    <div class="feature-list">
+                        <div class="feature-badge">Column cleanup</div>
+                        <div class="feature-badge">Header normalization</div>
+                        <div class="feature-badge">Keyword sheet retained</div>
+                    </div>
+                    <div class="panel">
+                        <div class="field-full">
+                            <label for="basicCleanupFile">Workbook</label>
+                            <input type="file" id="basicCleanupFile" accept=".xlsx,.xls">
+                        </div>
+                        <div class="actions">
+                            <button class="btn btn-primary" onclick="processBasicCleanup()">Clean and Export</button>
+                            <button class="btn" onclick="previewBasicCleanup()">Preview</button>
+                        </div>
+                        <div id="statusBasicCleanup" class="status"></div>
+                        <div id="previewBasicCleanup" class="preview"></div>
+                    </div>
+                </div>
+            </article>
+
+            <article class="module-card" data-asset="4">
+                <div class="module-inner">
+                    <div class="module-top">
+                        <div>
+                            <div class="module-tag">Module 04</div>
+                            <h2 class="module-title">Retailer Split Export</h2>
+                        </div>
+                    </div>
+                    <p class="module-copy">Build a cleaned master sheet and generate additional sheets split by retailer-specific RPC and URL columns.</p>
+                    <div class="feature-list">
+                        <div class="feature-badge">Retailer sheet generation</div>
+                        <div class="feature-badge">Master sheet export</div>
+                        <div class="feature-badge">Empty row removal</div>
+                    </div>
+                    <div class="panel">
+                        <div class="field-full">
+                            <label for="retailerFile">Workbook</label>
+                            <input type="file" id="retailerFile" accept=".xlsx,.xls">
+                        </div>
+                        <div class="actions">
+                            <button class="btn" onclick="processMasterOnly()">Export Clean Master</button>
+                            <button class="btn btn-primary" onclick="processRetailerSplit()">Split by Retailer</button>
+                        </div>
+                        <div id="statusRetailer" class="status"></div>
+                    </div>
+                </div>
+            </article>
+        </section>
+
+        <footer>
+            Workbook Operations Hub | Static-ready for Vercel deployment
+        </footer>
+    </main>
+
+    <script>
+        const COLUMNS_TO_DROP = ['brand type', 'visibility', 'fli type'];
+        const categoryFilterState = {
+            workbook: null,
+            headers: [],
+            processedData: [],
+            categoryColumns: [],
+            categoryOptions: [],
+            selectedCategories: new Set(),
+            matchedCount: 0
+        };
+
+        document.getElementById('categoryFilterFile').addEventListener('change', initializeCategoryFilterState);
+        document.getElementById('categorySelectorTrigger').addEventListener('click', toggleCategorySelector);
+        document.getElementById('categorySearch').addEventListener('input', renderCategoryOptions);
+        document.addEventListener('click', handleOutsideClick);
+
+        function showStatus(element, message, type) {
+            element.innerHTML = message;
+            element.className = `status show ${type}`;
+            if (type === 'success') {
+                setTimeout(() => {
+                    element.className = 'status';
+                }, 7000);
+            }
+        }
+
+        function showPreview(element, html) {
+            element.innerHTML = html;
+            element.classList.add('show');
+        }
+
+        function hidePreview(element) {
+            element.innerHTML = '';
+            element.classList.remove('show');
+        }
+
+        function cleanColumnName(colName) {
+            if (typeof colName !== 'string') return colName;
+            return colName.trim().replace(/\n/g, '');
+        }
+
+        function isEmptyCell(value) {
+            if (value === null || value === undefined) return true;
+            if (typeof value === 'string') return value.trim() === '';
+            if (typeof value === 'number') return false;
+            return String(value).trim() === '';
+        }
+
+        function findRPCAndURLColumns(headers) {
+            const rpcCols = [];
+            const urlCols = [];
+            headers.forEach((header, index) => {
+                const cleanHeader = cleanColumnName(header);
+                if (/^\s*RPC\s/i.test(cleanHeader)) rpcCols.push(index);
+                if (/^\s*URL\s/i.test(cleanHeader)) urlCols.push(index);
+            });
+            return { rpcCols, urlCols };
+        }
+
+        function applySheetStyles(worksheet, dataMatrix) {
+            worksheet['!views'] = [{ zoomScale: 80 }];
+            if (dataMatrix && dataMatrix.length > 0) {
+                worksheet['!cols'] = dataMatrix[0].map((_, i) => {
+                    const width = dataMatrix.reduce((max, row) => {
+                        const value = row[i] === undefined || row[i] === null ? '' : String(row[i]);
+                        return Math.min(60, Math.max(max, value.length));
+                    }, 12);
+                    return { wch: width + 2 };
+                });
+            }
+
+            const range = XLSX.utils.decode_range(worksheet['!ref']);
+            for (let column = range.s.c; column <= range.e.c; column += 1) {
+                const cellAddress = XLSX.utils.encode_cell({ r: 0, c: column });
+                if (!worksheet[cellAddress]) continue;
+                worksheet[cellAddress].s = {
+                    font: { bold: true, color: { rgb: 'FFFFFF' }, name: 'Calibri', sz: 11 },
+                    fill: { fgColor: { rgb: '1F6A5D' } },
+                    alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+                    border: {
+                        top: { style: 'thin', color: { rgb: 'D9D2C4' } },
+                        bottom: { style: 'thin', color: { rgb: 'D9D2C4' } },
+                        left: { style: 'thin', color: { rgb: 'D9D2C4' } },
+                        right: { style: 'thin', color: { rgb: 'D9D2C4' } }
+                    }
+                };
+            }
+        }
+
+        function getExpandedWorksheet(worksheet) {
+            const cellAddresses = Object.keys(worksheet).filter((key) => !key.startsWith('!'));
+            if (!cellAddresses.length) return worksheet;
+
+            let minRow = Number.POSITIVE_INFINITY;
+            let minCol = Number.POSITIVE_INFINITY;
+            let maxRow = 0;
+            let maxCol = 0;
+
+            cellAddresses.forEach((address) => {
+                const cell = XLSX.utils.decode_cell(address);
+                minRow = Math.min(minRow, cell.r);
+                minCol = Math.min(minCol, cell.c);
+                maxRow = Math.max(maxRow, cell.r);
+                maxCol = Math.max(maxCol, cell.c);
+            });
+
+            const nextWorksheet = { ...worksheet };
+            nextWorksheet['!ref'] = XLSX.utils.encode_range({
+                s: { r: Number.isFinite(minRow) ? minRow : 0, c: Number.isFinite(minCol) ? minCol : 0 },
+                e: { r: maxRow, c: maxCol }
+            });
+            return nextWorksheet;
+        }
+
+        function getWorksheetMatrix(worksheet) {
+            return XLSX.utils.sheet_to_json(getExpandedWorksheet(worksheet), { header: 1, defval: '' });
+        }
+
+        function processWorksheetData(worksheet, columnsToDrop) {
+            const jsonData = getWorksheetMatrix(worksheet);
+            if (!jsonData.length) {
+                return { headers: [], data: [] };
+            }
+
+            const headers = jsonData[0].map(cleanColumnName);
+            const keepIndices = headers
+                .map((header, index) => ({ header, index }))
+                .filter(({ header }) => !columnsToDrop.includes(String(header).toLowerCase()));
+
+            const filteredHeaders = keepIndices.map(({ header }) => header);
+            const processedData = jsonData.slice(1).map((row) => {
+                const rowObject = {};
+                keepIndices.forEach(({ header, index }) => {
+                    rowObject[header] = index < row.length ? row[index] : '';
+                });
+                return rowObject;
+            });
+
+            return { headers: filteredHeaders, data: processedData };
+        }
+
+        function findBestSheetName(workbook, preferredTerms) {
+            const normalizedTerms = preferredTerms.map((term) => term.toLowerCase());
+            return workbook.SheetNames.find((sheetName) => {
+                const lowerName = sheetName.toLowerCase();
+                return normalizedTerms.some((term) => lowerName.includes(term));
+            }) || workbook.SheetNames[0];
+        }
+
+        function findOptionalSheetName(workbook, preferredTerms) {
+            const normalizedTerms = preferredTerms.map((term) => term.toLowerCase());
+            return workbook.SheetNames.find((sheetName) => {
+                const lowerName = sheetName.toLowerCase();
+                return normalizedTerms.some((term) => lowerName.includes(term));
+            }) || null;
+        }
+
+        function getCategoryColumnNames(headers) {
+            const categoryColumns = headers.filter((header) => {
+                const lowerHeader = String(header).toLowerCase();
+                return lowerHeader.includes('category') || lowerHeader.includes('level');
+            });
+
+            if (categoryColumns.length) return categoryColumns;
+            return headers.slice(0, Math.min(6, headers.length));
+        }
+
+        function getRowCategoryValues(row, categoryColumns) {
+            return categoryColumns
+                .map((column) => row[column])
+                .filter((value) => !isEmptyCell(value))
+                .map((value) => String(value).trim());
+        }
+
+        function buildCombinedCategory(row, categoryColumns, prependCategory, separator) {
+            const prefix = prependCategory.trim();
+            const values = getRowCategoryValues(row, categoryColumns);
+            const combined = prefix ? [prefix, ...values] : values;
+            return combined.join(separator);
+        }
+
+        function sanitizeFileName(value, fallback) {
+            const cleaned = value.replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '').toLowerCase();
+            return cleaned || fallback;
+        }
+
+        async function readWorkbookFromInput(fileInput) {
+            if (!fileInput.files.length) throw new Error('Please select an Excel file');
+            const file = fileInput.files[0];
+            const data = await file.arrayBuffer();
+            return XLSX.read(data);
+        }
+
+        function filterRowsWithContent(processedData, headers) {
+            const { rpcCols, urlCols } = findRPCAndURLColumns(headers);
+            const rpcColumns = rpcCols.map((index) => headers[index]);
+            const urlColumns = urlCols.map((index) => headers[index]);
+
+            if (!rpcColumns.length && !urlColumns.length) {
+                return processedData;
+            }
+
+            return processedData.filter((row) => {
+                const allRPCEmpty = rpcColumns.every((column) => isEmptyCell(row[column]));
+                const allURLEmpty = urlColumns.every((column) => isEmptyCell(row[column]));
+                return !(allRPCEmpty && allURLEmpty);
+            });
+        }
+
+        async function processCategoriesHierarchy() {
+            const status = document.getElementById('statusCategories');
+            const preview = document.getElementById('previewCategories');
+            hidePreview(preview);
+
+            try {
+                showStatus(status, 'Reading workbook and building combined category paths...', 'loading');
+                const workbook = await readWorkbookFromInput(document.getElementById('categoriesFile'));
+                const sheetName = findBestSheetName(workbook, ['categories hierarchy', 'categories']);
+                const worksheet = workbook.Sheets[sheetName];
+                const jsonData = getWorksheetMatrix(worksheet);
+                if (!jsonData.length) throw new Error('The selected sheet is empty');
+
+                const headers = jsonData[0];
+                const categoryIndices = [];
+                headers.forEach((header, index) => {
+                    const lower = String(header || '').toLowerCase();
+                    if (lower.includes('category') || lower.includes('level')) categoryIndices.push(index);
+                });
+                if (!categoryIndices.length) {
+                    for (let i = 0; i < Math.min(6, headers.length); i += 1) categoryIndices.push(i);
+                }
+
+                const outputSet = new Set();
+                const outputRows = jsonData.slice(1)
+                    .map((row) => categoryIndices
+                        .map((index) => row[index])
+                        .filter((value) => !isEmptyCell(value))
+                        .map((value) => String(value).trim()))
+                    .filter((values) => values.length)
+                    .map((values) => values.join(' *** '))
+                    .filter((combined) => {
+                        if (outputSet.has(combined)) return false;
+                        outputSet.add(combined);
+                        return true;
+                    })
+                    .map((combined) => [combined]);
+
+                const matrix = [['Combined Category'], ...outputRows];
+                const workbookOut = XLSX.utils.book_new();
+                const worksheetOut = XLSX.utils.aoa_to_sheet(matrix);
+                applySheetStyles(worksheetOut, matrix);
+                XLSX.utils.book_append_sheet(workbookOut, worksheetOut, 'Combined Categories');
+                XLSX.writeFile(workbookOut, 'combined_categories.xlsx');
+                showStatus(status, `Export complete. ${outputRows.length} unique category paths were written.`, 'success');
+            } catch (error) {
+                showStatus(status, `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function previewCategories() {
+            const preview = document.getElementById('previewCategories');
+
+            try {
+                const workbook = await readWorkbookFromInput(document.getElementById('categoriesFile'));
+                const sheetName = findBestSheetName(workbook, ['categories hierarchy', 'categories']);
+                const worksheet = workbook.Sheets[sheetName];
+                const jsonData = getWorksheetMatrix(worksheet);
+                if (!jsonData.length) throw new Error('The selected sheet is empty');
+
+                const headers = jsonData[0];
+                const categoryIndices = [];
+                headers.forEach((header, index) => {
+                    const lower = String(header || '').toLowerCase();
+                    if (lower.includes('category') || lower.includes('level')) categoryIndices.push(index);
+                });
+                if (!categoryIndices.length) {
+                    for (let i = 0; i < Math.min(6, headers.length); i += 1) categoryIndices.push(i);
+                }
+
+                const previewSet = new Set();
+                const rows = jsonData.slice(1)
+                    .map((row, index) => ({
+                        rowNumber: index + 1,
+                        combined: categoryIndices
+                        .map((columnIndex) => row[columnIndex])
+                        .filter((value) => !isEmptyCell(value))
+                        .map((value) => String(value).trim())
+                        .join(' *** ')
+                    }))
+                    .filter(({ combined }) => combined)
+                    .filter(({ combined }) => {
+                        if (previewSet.has(combined)) return false;
+                        previewSet.add(combined);
+                        return true;
+                    })
+                    .slice(0, 10)
+                    .map(({ rowNumber, combined }) => `<div class="preview-row"><strong>Row ${rowNumber}</strong><br>${escapeHtml(combined)}</div>`)
+                    .join('');
+
+                showPreview(preview, `<div class="preview-title">Preview of unique combined category paths</div>${rows || '<div class="preview-row">No category rows found.</div>'}`);
+            } catch (error) {
+                showPreview(preview, `<div class="preview-title">Preview error</div><div class="preview-row">${error.message}</div>`);
+            }
+        }
+
+        async function initializeCategoryFilterState() {
+            const status = document.getElementById('statusCategoryFilter');
+            const preview = document.getElementById('previewCategoryFilter');
+            hidePreview(preview);
+
+            try {
+                showStatus(status, 'Loading workbook and preparing category options...', 'loading');
+                const workbook = await readWorkbookFromInput(document.getElementById('categoryFilterFile'));
+                const sheetName = findBestSheetName(workbook, ['product list', 'master', 'products']);
+                const worksheet = workbook.Sheets[sheetName];
+                const { headers, data } = processWorksheetData(worksheet, COLUMNS_TO_DROP);
+                if (!headers.length || !data.length) throw new Error('No product rows were found in the selected workbook');
+
+                const categoryColumns = getCategoryColumnNames(headers);
+                const optionSet = new Set();
+                data.forEach((row) => {
+                    getRowCategoryValues(row, categoryColumns).forEach((value) => optionSet.add(value));
+                });
+
+                categoryFilterState.workbook = workbook;
+                categoryFilterState.headers = headers;
+                categoryFilterState.processedData = data;
+                categoryFilterState.categoryColumns = categoryColumns;
+                categoryFilterState.categoryOptions = Array.from(optionSet).sort((a, b) => a.localeCompare(b));
+                categoryFilterState.selectedCategories = new Set();
+                categoryFilterState.matchedCount = 0;
+
+                document.getElementById('categoryOptionCount').textContent = String(categoryFilterState.categoryOptions.length);
+                document.getElementById('categoryMatchedCount').textContent = '0';
+                renderCategoryOptions();
+                updateCategorySelectorUI();
+                showStatus(status, `Workbook loaded. ${categoryFilterState.categoryOptions.length} category values are ready for multi-select filtering.`, 'success');
+            } catch (error) {
+                categoryFilterState.workbook = null;
+                categoryFilterState.headers = [];
+                categoryFilterState.processedData = [];
+                categoryFilterState.categoryColumns = [];
+                categoryFilterState.categoryOptions = [];
+                categoryFilterState.selectedCategories = new Set();
+                categoryFilterState.matchedCount = 0;
+                renderCategoryOptions();
+                updateCategorySelectorUI();
+                showStatus(status, `Error: ${error.message}`, 'error');
+            }
+        }
+
+        function toggleCategorySelector() {
+            if (!categoryFilterState.categoryOptions.length) return;
+            document.getElementById('categorySelectorPanel').classList.toggle('open');
+        }
+
+        function handleOutsideClick(event) {
+            const selector = document.getElementById('categorySelector');
+            if (!selector.contains(event.target)) {
+                document.getElementById('categorySelectorPanel').classList.remove('open');
+            }
+        }
+
+        function renderCategoryOptions() {
+            const container = document.getElementById('categoryOptions');
+            const keyword = document.getElementById('categorySearch').value.trim().toLowerCase();
+            const options = categoryFilterState.categoryOptions.filter((option) => option.toLowerCase().includes(keyword));
+
+            if (!options.length) {
+                container.innerHTML = '<div class="preview-row">No category values found for the current search.</div>';
+                return;
+            }
+
+            container.innerHTML = options.map((option) => `
+                <label class="option-item">
+                    <input type="checkbox" value="${escapeHtml(option)}" ${categoryFilterState.selectedCategories.has(option) ? 'checked' : ''} onchange="toggleCategoryOption(this)">
+                    <span>${escapeHtml(option)}</span>
+                </label>
+            `).join('');
+        }
+
+        function toggleCategoryOption(checkbox) {
+            const value = checkbox.value;
+            if (checkbox.checked) categoryFilterState.selectedCategories.add(value);
+            else categoryFilterState.selectedCategories.delete(value);
+            updateCategorySelectorUI();
+        }
+
+        function selectAllCategoryOptions() {
+            const keyword = document.getElementById('categorySearch').value.trim().toLowerCase();
+            categoryFilterState.categoryOptions
+                .filter((option) => option.toLowerCase().includes(keyword))
+                .forEach((option) => categoryFilterState.selectedCategories.add(option));
+            renderCategoryOptions();
+            updateCategorySelectorUI();
+        }
+
+        function clearCategoryOptions() {
+            categoryFilterState.selectedCategories.clear();
+            renderCategoryOptions();
+            updateCategorySelectorUI();
+        }
+
+        function removeCategoryChip(value) {
+            categoryFilterState.selectedCategories.delete(value);
+            renderCategoryOptions();
+            updateCategorySelectorUI();
+        }
+
+        function updateCategorySelectorUI() {
+            const selected = Array.from(categoryFilterState.selectedCategories);
+            const count = selected.length;
+            const label = document.getElementById('categorySelectorLabel');
+            const chips = document.getElementById('categorySelectedChips');
+            document.getElementById('categorySelectedCount').textContent = String(count);
+
+            if (!categoryFilterState.categoryOptions.length) {
+                label.textContent = 'Upload a workbook to load category options';
+                chips.innerHTML = '';
+                return;
+            }
+
+            if (!count) label.textContent = 'Choose one or more category values';
+            else if (count === 1) label.textContent = selected[0];
+            else label.textContent = `${count} category values selected`;
+
+            chips.innerHTML = selected.map((value) => `
+                <div class="chip">
+                    <span>${escapeHtml(value)}</span>
+                    <button type="button" onclick="removeCategoryChip('${escapeJs(value)}')">Remove</button>
+                </div>
+            `).join('');
+        }
+
+        function getCategoryFilterResult() {
+            if (!categoryFilterState.processedData.length) {
+                throw new Error('Please upload a workbook for the category filter module');
+            }
+
+            const selected = Array.from(categoryFilterState.selectedCategories);
+            if (!selected.length) {
+                throw new Error('Please select at least one category value');
+            }
+
+            const separator = document.getElementById('categorySeparatorInput').value || ' *** ';
+            const prependCategory = document.getElementById('prependCategoryInput').value || '';
+            const cleanedRows = filterRowsWithContent(categoryFilterState.processedData, categoryFilterState.headers);
+            const selectedLower = selected.map((value) => value.toLowerCase());
+
+            const filteredRows = cleanedRows.filter((row) => {
+                const values = getRowCategoryValues(row, categoryFilterState.categoryColumns).map((value) => value.toLowerCase());
+                return values.some((value) => selectedLower.includes(value));
+            });
+
+            const outputHeaders = [...categoryFilterState.headers, 'Combined Category'];
+            const outputRows = filteredRows.map((row) => {
+                const combinedCategory = buildCombinedCategory(row, categoryFilterState.categoryColumns, prependCategory, separator);
+                return {
+                    ...row,
+                    'Combined Category': combinedCategory
+                };
+            });
+
+            return {
+                selected,
+                separator,
+                prependCategory,
+                outputHeaders,
+                outputRows
+            };
+        }
+
+        async function processCategoryFilter() {
+            const status = document.getElementById('statusCategoryFilter');
+
+            try {
+                showStatus(status, 'Filtering rows and building updated category paths...', 'loading');
+                const { selected, outputHeaders, outputRows } = getCategoryFilterResult();
+                if (!outputRows.length) {
+                    throw new Error(`No rows matched the selected category values: ${selected.join(', ')}`);
+                }
+
+                const matrix = [
+                    outputHeaders,
+                    ...outputRows.map((row) => outputHeaders.map((header) => row[header] !== undefined ? row[header] : ''))
+                ];
+                const workbookOut = XLSX.utils.book_new();
+                const worksheetOut = XLSX.utils.aoa_to_sheet(matrix);
+                applySheetStyles(worksheetOut, matrix);
+                XLSX.utils.book_append_sheet(workbookOut, worksheetOut, 'Filtered Products');
+                XLSX.writeFile(workbookOut, `filtered_products_${sanitizeFileName(selected.join('_'), 'selection')}.xlsx`);
+                showStatus(status, `Export complete. ${outputRows.length} matched rows were written with a Combined Category column.`, 'success');
+            } catch (error) {
+                showStatus(status, `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function previewCategoryFilter() {
+            const preview = document.getElementById('previewCategoryFilter');
+
+            try {
+                const { selected, prependCategory, separator, outputRows } = getCategoryFilterResult();
+                categoryFilterState.matchedCount = outputRows.length;
+                document.getElementById('categoryMatchedCount').textContent = String(outputRows.length);
+
+                if (!outputRows.length) {
+                    showPreview(preview, `<div class="preview-title">Preview</div><div class="preview-row">No rows matched the selected values: ${escapeHtml(selected.join(', '))}</div>`);
+                    return;
+                }
+
+                const rows = outputRows.slice(0, 5).map((row, index) => `
+                    <div class="preview-row">
+                        <strong>Row ${index + 1}</strong><br>
+                        Selected nodes: ${escapeHtml(selected.join(', '))}<br>
+                        ${prependCategory ? `Prepended top-level category: ${escapeHtml(prependCategory)}<br>` : ''}
+                        Combined Category: ${escapeHtml(row['Combined Category'])}
+                    </div>
+                `).join('');
+
+                showPreview(
+                    preview,
+                    `<div class="preview-title">Matched rows: ${outputRows.length}</div>
+                     <div class="preview-row">Separator in use: <strong>${escapeHtml(separator)}</strong></div>${rows}`
+                );
+            } catch (error) {
+                showPreview(preview, `<div class="preview-title">Preview error</div><div class="preview-row">${escapeHtml(error.message)}</div>`);
+            }
+        }
+
+        async function processBasicCleanup() {
+            const status = document.getElementById('statusBasicCleanup');
+            const preview = document.getElementById('previewBasicCleanup');
+            hidePreview(preview);
+
+            try {
+                showStatus(status, 'Cleaning workbook and preparing export...', 'loading');
+                const workbook = await readWorkbookFromInput(document.getElementById('basicCleanupFile'));
+                const productSheetName = findBestSheetName(workbook, ['product list', 'master', 'products']);
+                const keywordSheetName = findOptionalSheetName(workbook, ['search terms', 'keywords']);
+                const worksheet = workbook.Sheets[productSheetName];
+                const { headers, data } = processWorksheetData(worksheet, COLUMNS_TO_DROP);
+                const filteredRows = filterRowsWithContent(data, headers);
+                if (!filteredRows.length) throw new Error('All rows were removed because RPC and URL columns were empty');
+
+                const workbookOut = XLSX.utils.book_new();
+                const matrix = [headers, ...filteredRows.map((row) => headers.map((header) => row[header] !== undefined ? row[header] : ''))];
+                const worksheetOut = XLSX.utils.aoa_to_sheet(matrix);
+                applySheetStyles(worksheetOut, matrix);
+                XLSX.utils.book_append_sheet(workbookOut, worksheetOut, 'Products');
+
+                if (keywordSheetName && workbook.Sheets[keywordSheetName]) {
+                    const keywordRows = XLSX.utils.sheet_to_json(workbook.Sheets[keywordSheetName], { defval: '' });
+                    if (keywordRows.length) {
+                        XLSX.utils.book_append_sheet(workbookOut, XLSX.utils.json_to_sheet(keywordRows), 'Keywords');
+                    }
+                }
+
+                XLSX.writeFile(workbookOut, 'master_list_cleaned.xlsx');
+                showStatus(status, `Export complete. ${filteredRows.length} cleaned rows were written.`, 'success');
+            } catch (error) {
+                showStatus(status, `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function previewBasicCleanup() {
+            const preview = document.getElementById('previewBasicCleanup');
+
+            try {
+                const workbook = await readWorkbookFromInput(document.getElementById('basicCleanupFile'));
+                const productSheetName = findBestSheetName(workbook, ['product list', 'master', 'products']);
+                const worksheet = workbook.Sheets[productSheetName];
+                const { headers, data } = processWorksheetData(worksheet, COLUMNS_TO_DROP);
+                const filteredRows = filterRowsWithContent(data, headers);
+                const sampleRows = filteredRows.slice(0, 5).map((row, index) => `
+                    <div class="preview-row"><strong>Row ${index + 1}</strong><br>${escapeHtml(headers.map((header) => `${header}: ${row[header] ?? ''}`).join(' | '))}</div>
+                `).join('');
+
+                showPreview(preview, `<div class="preview-title">Preview of cleaned product rows</div>${sampleRows || '<div class="preview-row">No rows remain after cleanup.</div>'}`);
+            } catch (error) {
+                showPreview(preview, `<div class="preview-title">Preview error</div><div class="preview-row">${escapeHtml(error.message)}</div>`);
+            }
+        }
+
+        async function processMasterOnly() {
+            const status = document.getElementById('statusRetailer');
+
+            try {
+                showStatus(status, 'Creating a clean master export...', 'loading');
+                const workbook = await readWorkbookFromInput(document.getElementById('retailerFile'));
+                const productSheetName = findBestSheetName(workbook, ['product list', 'master', 'products']);
+                const keywordSheetName = findOptionalSheetName(workbook, ['search terms', 'keywords']);
+                const worksheet = workbook.Sheets[productSheetName];
+                const { headers, data } = processWorksheetData(worksheet, COLUMNS_TO_DROP);
+                const filteredRows = filterRowsWithContent(data, headers);
+                if (!filteredRows.length) throw new Error('All rows were removed because RPC and URL columns were empty');
+
+                const workbookOut = XLSX.utils.book_new();
+                const matrix = [headers, ...filteredRows.map((row) => headers.map((header) => row[header] !== undefined ? row[header] : ''))];
+                const worksheetOut = XLSX.utils.aoa_to_sheet(matrix);
+                applySheetStyles(worksheetOut, matrix);
+                XLSX.utils.book_append_sheet(workbookOut, worksheetOut, 'Products');
+
+                if (keywordSheetName && workbook.Sheets[keywordSheetName]) {
+                    const keywordRows = XLSX.utils.sheet_to_json(workbook.Sheets[keywordSheetName], { defval: '' });
+                    if (keywordRows.length) {
+                        XLSX.utils.book_append_sheet(workbookOut, XLSX.utils.json_to_sheet(keywordRows), 'Keywords');
+                    }
+                }
+
+                XLSX.writeFile(workbookOut, 'master_list.xlsx');
+                showStatus(status, `Export complete. ${filteredRows.length} rows were written to the master sheet.`, 'success');
+            } catch (error) {
+                showStatus(status, `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function processRetailerSplit() {
+            const status = document.getElementById('statusRetailer');
+
+            try {
+                showStatus(status, 'Detecting retailer columns and building split sheets...', 'loading');
+                const workbook = await readWorkbookFromInput(document.getElementById('retailerFile'));
+                const productSheetName = findBestSheetName(workbook, ['product list', 'master', 'products']);
+                const worksheet = workbook.Sheets[productSheetName];
+                const { headers, data } = processWorksheetData(worksheet, COLUMNS_TO_DROP);
+                const filteredRows = filterRowsWithContent(data, headers);
+                if (!filteredRows.length) throw new Error('All rows were removed because RPC and URL columns were empty');
+
+                const retailerMap = {};
+                const commonColumns = [];
+
+                headers.forEach((header) => {
+                    const rpcMatch = header.match(/^\s*RPC\s+([^,0-9]+?)(?=\s*[,\d]|$)/i);
+                    const urlMatch = header.match(/^\s*URL\s+([^,0-9]+?)(?=\s*[,\d]|$)/i);
+
+                    if (rpcMatch) {
+                        const retailer = toTitleCase(rpcMatch[1].trim());
+                        retailerMap[retailer] = retailerMap[retailer] || { rpcCol: null, urlCol: null };
+                        retailerMap[retailer].rpcCol = header;
+                    } else if (urlMatch) {
+                        const retailer = toTitleCase(urlMatch[1].trim());
+                        retailerMap[retailer] = retailerMap[retailer] || { rpcCol: null, urlCol: null };
+                        retailerMap[retailer].urlCol = header;
+                    } else {
+                        commonColumns.push(header);
+                    }
+                });
+
+                const workbookOut = XLSX.utils.book_new();
+                const masterMatrix = [headers, ...filteredRows.map((row) => headers.map((header) => row[header] !== undefined ? row[header] : ''))];
+                const masterSheet = XLSX.utils.aoa_to_sheet(masterMatrix);
+                applySheetStyles(masterSheet, masterMatrix);
+                XLSX.utils.book_append_sheet(workbookOut, masterSheet, 'Products');
+
+                let sheetCount = 0;
+                Object.entries(retailerMap).forEach(([retailer, cols]) => {
+                    const retailerColumns = [cols.rpcCol, cols.urlCol].filter(Boolean);
+                    const retailerRows = filteredRows.filter((row) => retailerColumns.some((column) => !isEmptyCell(row[column])));
+                    if (!retailerRows.length) return;
+
+                    const outputColumns = [...commonColumns, ...retailerColumns];
+                    const matrix = [outputColumns, ...retailerRows.map((row) => outputColumns.map((column) => row[column] !== undefined ? row[column] : ''))];
+                    const sheet = XLSX.utils.aoa_to_sheet(matrix);
+                    applySheetStyles(sheet, matrix);
+                    XLSX.utils.book_append_sheet(workbookOut, sheet, retailer.substring(0, 31) || `Retailer_${sheetCount + 1}`);
+                    sheetCount += 1;
+                });
+
+                XLSX.writeFile(workbookOut, 'retailer_split_export.xlsx');
+                showStatus(status, `Export complete. ${sheetCount} retailer sheets were generated in addition to the master sheet.`, 'success');
+            } catch (error) {
+                showStatus(status, `Error: ${error.message}`, 'error');
+            }
+        }
+
+        function toTitleCase(value) {
+            return value.toLowerCase().replace(/(?:^|\s)\w/g, (match) => match.toUpperCase());
+        }
+
+        function escapeHtml(value) {
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function escapeJs(value) {
+            return String(value).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        }
+    </script>
+</body>
+</html>
