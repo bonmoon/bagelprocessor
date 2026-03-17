@@ -624,6 +624,59 @@
             color: var(--muted);
         }
 
+        .config-list {
+            display: grid;
+            gap: 14px;
+            margin-top: 14px;
+        }
+
+        .config-row {
+            padding: 16px;
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.74);
+            border: 1px solid rgba(76, 57, 34, 0.08);
+        }
+
+        .config-row-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .config-row-title {
+            font-size: 14px;
+            font-weight: 800;
+            color: var(--accent-strong);
+        }
+
+        .select-input {
+            width: 100%;
+            border: 1px solid rgba(76, 57, 34, 0.14);
+            background: #fffdf9;
+            border-radius: 14px;
+            padding: 14px 16px;
+            font: inherit;
+            color: var(--text);
+        }
+
+        .config-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 14px;
+        }
+
+        .btn-subtle {
+            background: rgba(31, 106, 93, 0.1);
+            color: var(--accent-strong);
+        }
+
+        .btn-subtle:hover {
+            background: rgba(31, 106, 93, 0.16);
+        }
+
         footer {
             margin-top: 28px;
             padding: 18px 6px 8px;
@@ -903,6 +956,72 @@
                     </div>
                 </div>
             </article>
+
+            <article class="module-card" data-asset="1">
+                <div class="module-inner">
+                    <div class="module-top">
+                        <div>
+                            <div class="module-tag">Module 05</div>
+                            <h2 class="module-title">Client File Comparison</h2>
+                        </div>
+                    </div>
+                    <p class="module-copy">Compare the current tracked master workbook against a client file using retailer-specific identifier mappings such as RPC, SKU, or URL.</p>
+                    <div class="feature-list">
+                        <div class="feature-badge">Raw master upload supported</div>
+                        <div class="feature-badge">Multi-group comparison</div>
+                        <div class="feature-badge">Additions and removals export</div>
+                    </div>
+                    <div class="panel">
+                        <div class="field-grid">
+                            <div class="field">
+                                <label for="comparisonMasterFile">Master workbook</label>
+                                <input type="file" id="comparisonMasterFile" accept=".xlsx,.xls">
+                            </div>
+                            <div class="field">
+                                <label for="comparisonClientFile">Client workbook</label>
+                                <input type="file" id="comparisonClientFile" accept=".xlsx,.xls">
+                            </div>
+                        </div>
+                        <p class="helper-text" style="margin-top: 12px;">
+                            The master workbook is cleaned automatically before comparison. By default, only rows with
+                            <strong>Owner = Client</strong> are compared. After both files are loaded, add one or more retailer
+                            groups and choose which columns should be used as identifiers on each side.
+                        </p>
+                        <div class="mini-stats">
+                            <div class="mini-stat">
+                                <strong id="comparisonMasterCount">0</strong>
+                                <span>master rows ready</span>
+                            </div>
+                            <div class="mini-stat">
+                                <strong id="comparisonClientCount">0</strong>
+                                <span>client rows ready</span>
+                            </div>
+                            <div class="mini-stat">
+                                <strong id="comparisonGroupCount">0</strong>
+                                <span>comparison groups</span>
+                            </div>
+                        </div>
+                        <div class="config-actions">
+                            <button class="btn btn-subtle" type="button" onclick="initializeComparisonState()">Load Headers</button>
+                            <button class="btn btn-subtle" type="button" onclick="addComparisonGroup()">Add Comparison Group</button>
+                            <button class="btn btn-subtle" type="button" onclick="addSuggestedComparisonGroups()">Add Suggested Retailers</button>
+                        </div>
+                        <div id="comparisonConfigList" class="config-list"></div>
+                        <div class="actions">
+                            <button class="btn btn-primary" onclick="processClientComparison()">Compare and Export</button>
+                            <button class="btn" onclick="previewClientComparison()">Preview Result</button>
+                            <button class="btn" onclick="exportGoogleSheetReady()">Export Google Sheet Ready</button>
+                            <button class="btn" onclick="generateJiraDraft()">Generate Jira Draft</button>
+                            <button class="btn" onclick="showReviewCases()">Review Cases</button>
+                            <button class="btn" onclick="generateDeepSeekJiraPrompt()">DeepSeek Jira Prompt</button>
+                            <button class="btn" onclick="generateDeepSeekReviewPrompt()">DeepSeek Review Prompt</button>
+                            <button class="btn" onclick="generateDeepSeekHandoffPrompt()">DeepSeek Handoff Prompt</button>
+                        </div>
+                        <div id="statusComparison" class="status"></div>
+                        <div id="previewComparison" class="preview"></div>
+                    </div>
+                </div>
+            </article>
         </section>
 
         <footer>
@@ -921,8 +1040,23 @@
             selectedCategories: new Set(),
             matchedCount: 0
         };
+        const comparisonState = {
+            masterWorkbook: null,
+            clientWorkbook: null,
+            masterHeaders: [],
+            masterRows: [],
+            clientHeaders: [],
+            clientSheets: {},
+            clientSheetNames: [],
+            clientRows: [],
+            retailerOptions: [],
+            groups: [],
+            lastResult: null
+        };
 
         document.getElementById('categoryFilterFile').addEventListener('change', initializeCategoryFilterState);
+        document.getElementById('comparisonMasterFile').addEventListener('change', initializeComparisonState);
+        document.getElementById('comparisonClientFile').addEventListener('change', initializeComparisonState);
         document.getElementById('categorySelectorTrigger').addEventListener('click', toggleCategorySelector);
         document.getElementById('categorySearch').addEventListener('input', renderCategoryOptions);
         document.addEventListener('click', handleOutsideClick);
@@ -1041,11 +1175,12 @@
                 .filter(({ header }) => !columnsToDrop.includes(String(header).toLowerCase()));
 
             const filteredHeaders = keepIndices.map(({ header }) => header);
-            const processedData = jsonData.slice(1).map((row) => {
+            const processedData = jsonData.slice(1).map((row, rowIndex) => {
                 const rowObject = {};
                 keepIndices.forEach(({ header, index }) => {
                     rowObject[header] = index < row.length ? row[index] : '';
                 });
+                rowObject.__sourceRowNumber = rowIndex + 2;
                 return rowObject;
             });
 
@@ -1118,6 +1253,937 @@
                 const allURLEmpty = urlColumns.every((column) => isEmptyCell(row[column]));
                 return !(allRPCEmpty && allURLEmpty);
             });
+        }
+
+        function getRetailerMapFromHeaders(headers) {
+            const retailerMap = {};
+            headers.forEach((header) => {
+                const rpcMatch = header.match(/^\s*RPC\s+([^,0-9]+?)(?=\s*[,\d]|$)/i);
+                const urlMatch = header.match(/^\s*URL\s+([^,0-9]+?)(?=\s*[,\d]|$)/i);
+
+                if (rpcMatch) {
+                    const retailer = toTitleCase(rpcMatch[1].trim());
+                    retailerMap[retailer] = retailerMap[retailer] || { rpcCols: [], urlCols: [] };
+                    retailerMap[retailer].rpcCols.push(header);
+                }
+                if (urlMatch) {
+                    const retailer = toTitleCase(urlMatch[1].trim());
+                    retailerMap[retailer] = retailerMap[retailer] || { rpcCols: [], urlCols: [] };
+                    retailerMap[retailer].urlCols.push(header);
+                }
+            });
+            return retailerMap;
+        }
+
+        function getPreferredComparisonColumn(retailerConfig, type) {
+            const list = type === 'rpc' ? retailerConfig.rpcCols : retailerConfig.urlCols;
+            return list && list.length ? list[0] : '';
+        }
+
+        function updateComparisonStats() {
+            document.getElementById('comparisonMasterCount').textContent = String(comparisonState.masterRows.length);
+            document.getElementById('comparisonClientCount').textContent = String(comparisonState.clientRows.length);
+            document.getElementById('comparisonGroupCount').textContent = String(comparisonState.groups.length);
+        }
+
+        function createComparisonGroup(seed = {}) {
+            return {
+                id: seed.id || `cmp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+                retailerName: seed.retailerName || '',
+                masterColumn: seed.masterColumn || '',
+                clientSheet: seed.clientSheet || '',
+                clientColumn: seed.clientColumn || ''
+            };
+        }
+
+        function buildSelectOptions(options, selectedValue, placeholder) {
+            const placeholderOption = `<option value="">${escapeHtml(placeholder)}</option>`;
+            const values = options.map((option) => {
+                const value = typeof option === 'string' ? option : option.value;
+                const label = typeof option === 'string' ? option : option.label;
+                const selected = value === selectedValue ? 'selected' : '';
+                return `<option value="${escapeHtml(value)}" ${selected}>${escapeHtml(label)}</option>`;
+            }).join('');
+            return `${placeholderOption}${values}`;
+        }
+
+        function renderComparisonGroups() {
+            const container = document.getElementById('comparisonConfigList');
+            if (!comparisonState.groups.length) {
+                container.innerHTML = '<div class="preview-row">No comparison groups yet. Load the files, then add one or more groups.</div>';
+                updateComparisonStats();
+                return;
+            }
+
+            const retailerOptions = comparisonState.retailerOptions.map((retailer) => ({ value: retailer, label: retailer }));
+            const clientSheetOptions = comparisonState.clientSheetNames.map((sheetName) => ({ value: sheetName, label: sheetName }));
+            container.innerHTML = comparisonState.groups.map((group, index) => `
+                <div class="config-row">
+                    <div class="config-row-head">
+                        <div class="config-row-title">Comparison Group ${index + 1}</div>
+                        <button class="btn btn-subtle" type="button" onclick="removeComparisonGroup('${group.id}')">Remove</button>
+                    </div>
+                    <div class="helper-text" style="margin-bottom: 12px;">${escapeHtml(getComparisonGroupSummaryText(group))}</div>
+                    <div class="field-grid">
+                        <div class="field">
+                            <label>Retailer name</label>
+                            <input type="text" value="${escapeHtml(group.retailerName)}" placeholder="Custom retailer label" oninput="updateComparisonGroup('${group.id}', 'retailerName', this.value)">
+                        </div>
+                        <div class="field">
+                            <label>Retailer suggestion</label>
+                            <select class="select-input" onchange="applyRetailerSuggestion('${group.id}', this.value)">
+                                ${buildSelectOptions(retailerOptions, '', 'Use a detected retailer')}
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>Master identifier column</label>
+                            <select class="select-input" onchange="updateComparisonGroup('${group.id}', 'masterColumn', this.value)">
+                                ${buildSelectOptions(comparisonState.masterHeaders, group.masterColumn, 'Choose master identifier')}
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>Client sheet</label>
+                            <select class="select-input" onchange="updateComparisonClientSheet('${group.id}', this.value)">
+                                ${buildSelectOptions(clientSheetOptions, group.clientSheet, 'Choose client sheet')}
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>Client identifier column</label>
+                            <select class="select-input" onchange="updateComparisonGroup('${group.id}', 'clientColumn', this.value)">
+                                ${buildSelectOptions(getClientHeadersForGroup(group), group.clientColumn, 'Choose client identifier')}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+            updateComparisonStats();
+        }
+
+        function updateComparisonGroup(groupId, field, value) {
+            const group = comparisonState.groups.find((item) => item.id === groupId);
+            if (!group) return;
+            group[field] = value;
+            if (field !== 'retailerName') {
+                renderComparisonGroups();
+            }
+        }
+
+        function updateComparisonClientSheet(groupId, sheetName) {
+            const group = comparisonState.groups.find((item) => item.id === groupId);
+            if (!group) return;
+            group.clientSheet = sheetName;
+            group.clientColumn = '';
+            renderComparisonGroups();
+        }
+
+        function getClientHeadersForGroup(group) {
+            if (!group.clientSheet || !comparisonState.clientSheets[group.clientSheet]) return [];
+            return comparisonState.clientSheets[group.clientSheet].headers;
+        }
+
+        function getComparisonGroupSummary(group) {
+            if (!group.masterColumn || !group.clientSheet || !group.clientColumn) {
+                return null;
+            }
+            const clientSheetConfig = comparisonState.clientSheets[group.clientSheet];
+            if (!clientSheetConfig) return null;
+
+            const retailerName = group.retailerName.trim() || 'Group';
+            const masterMap = new Map();
+            comparisonState.masterRows.forEach((row) => {
+                const identifier = normalizeComparisonIdentifier(row[group.masterColumn], retailerName);
+                if (!identifier || masterMap.has(identifier)) return;
+                masterMap.set(identifier, row);
+            });
+
+            let clientIdCount = 0;
+            let matchedCount = 0;
+            let addCount = 0;
+            const clientSeen = new Set();
+            clientSheetConfig.rows.forEach((row) => {
+                const identifier = normalizeComparisonIdentifier(row[group.clientColumn], retailerName);
+                if (!identifier || clientSeen.has(identifier)) return;
+                clientSeen.add(identifier);
+                clientIdCount += 1;
+                if (masterMap.has(identifier)) matchedCount += 1;
+                else addCount += 1;
+            });
+
+            let removalCount = 0;
+            masterMap.forEach((_row, identifier) => {
+                if (!clientSeen.has(identifier)) removalCount += 1;
+            });
+
+            return {
+                clientIdCount,
+                matchedCount,
+                addCount,
+                removalCount
+            };
+        }
+
+        function getComparisonGroupSummaryText(group) {
+            const summary = getComparisonGroupSummary(group);
+            if (!summary) return 'Choose the master column, client sheet, and client identifier column to see counts.';
+            return `Preview counts: identifiers ${summary.clientIdCount} | matched ${summary.matchedCount} | add ${summary.addCount} | remove ${summary.removalCount}`;
+        }
+
+        function applyRetailerSuggestion(groupId, retailerName) {
+            if (!retailerName) return;
+            const retailerMap = getRetailerMapFromHeaders(comparisonState.masterHeaders);
+            const retailerConfig = retailerMap[retailerName];
+            const group = comparisonState.groups.find((item) => item.id === groupId);
+            if (!group || !retailerConfig) return;
+
+            group.retailerName = retailerName;
+            group.masterColumn = getPreferredComparisonColumn(retailerConfig, 'rpc') || getPreferredComparisonColumn(retailerConfig, 'url') || group.masterColumn;
+            renderComparisonGroups();
+        }
+
+        function addComparisonGroup(seed = {}) {
+            comparisonState.groups.push(createComparisonGroup({
+                clientSheet: comparisonState.clientSheetNames[0] || '',
+                ...seed
+            }));
+            renderComparisonGroups();
+        }
+
+        function removeComparisonGroup(groupId) {
+            comparisonState.groups = comparisonState.groups.filter((group) => group.id !== groupId);
+            renderComparisonGroups();
+        }
+
+        function addSuggestedComparisonGroups() {
+            const retailerMap = getRetailerMapFromHeaders(comparisonState.masterHeaders);
+            const retailers = Object.keys(retailerMap);
+            if (!retailers.length) return;
+
+            const existingNames = new Set(comparisonState.groups.map((group) => group.retailerName.toLowerCase()).filter(Boolean));
+            retailers.forEach((retailer) => {
+                if (existingNames.has(retailer.toLowerCase())) return;
+                const config = retailerMap[retailer];
+                comparisonState.groups.push(createComparisonGroup({
+                    retailerName: retailer,
+                    masterColumn: getPreferredComparisonColumn(config, 'rpc') || getPreferredComparisonColumn(config, 'url'),
+                    clientSheet: comparisonState.clientSheetNames[0] || ''
+                }));
+            });
+            renderComparisonGroups();
+        }
+
+        async function initializeComparisonState() {
+            const status = document.getElementById('statusComparison');
+            const preview = document.getElementById('previewComparison');
+            hidePreview(preview);
+
+            const masterInput = document.getElementById('comparisonMasterFile');
+            const clientInput = document.getElementById('comparisonClientFile');
+            if (!masterInput.files.length || !clientInput.files.length) {
+                renderComparisonGroups();
+                return;
+            }
+
+            try {
+                showStatus(status, 'Loading master and client workbooks for comparison...', 'loading');
+                const [masterWorkbook, clientWorkbook] = await Promise.all([
+                    readWorkbookFromInput(masterInput),
+                    readWorkbookFromInput(clientInput)
+                ]);
+
+                const masterSheetName = findBestSheetName(masterWorkbook, ['product list', 'master', 'products']);
+                const masterWorksheet = masterWorkbook.Sheets[masterSheetName];
+
+                const masterProcessed = processWorksheetData(masterWorksheet, COLUMNS_TO_DROP);
+                const cleanedMasterRows = filterRowsWithContent(masterProcessed.data, masterProcessed.headers);
+                const masterRows = filterMasterRowsForComparison(cleanedMasterRows, masterProcessed.headers);
+                const clientSheets = {};
+                const unionClientHeaders = new Set();
+                const allClientRows = [];
+
+                clientWorkbook.SheetNames.forEach((sheetName) => {
+                    const worksheet = clientWorkbook.Sheets[sheetName];
+                    const matrix = getWorksheetMatrix(worksheet);
+                    if (!matrix.length) return;
+
+                    const headers = matrix[0].map(cleanColumnName);
+                    const rows = matrix.slice(1).map((row) => {
+                        const rowObject = {};
+                        const sourceRowNumber = matrix.indexOf(row) + 1;
+                        headers.forEach((header, index) => {
+                            rowObject[header] = index < row.length ? row[index] : '';
+                        });
+                        rowObject.__clientSheet = sheetName;
+                        rowObject.__clientRowNumber = sourceRowNumber + 1;
+                        rowObject.__clientRowId = `${sheetName}::${sourceRowNumber + 1}`;
+                        return rowObject;
+                    }).filter((row) => Object.entries(row).some(([key, value]) => key !== '__clientSheet' && !isEmptyCell(value)));
+
+                    if (!rows.length) return;
+                    clientSheets[sheetName] = { headers, rows };
+                    headers.forEach((header) => unionClientHeaders.add(header));
+                    allClientRows.push(...rows);
+                });
+
+                const clientSheetNames = Object.keys(clientSheets);
+                if (!clientSheetNames.length) throw new Error('No non-empty sheets were found in the selected client workbook');
+
+                comparisonState.masterWorkbook = masterWorkbook;
+                comparisonState.clientWorkbook = clientWorkbook;
+                comparisonState.masterHeaders = masterProcessed.headers;
+                comparisonState.clientHeaders = Array.from(unionClientHeaders);
+                comparisonState.clientSheets = clientSheets;
+                comparisonState.clientSheetNames = clientSheetNames;
+                comparisonState.masterRows = masterRows;
+                comparisonState.clientRows = allClientRows;
+                comparisonState.retailerOptions = Object.keys(getRetailerMapFromHeaders(masterProcessed.headers)).sort((a, b) => a.localeCompare(b));
+                comparisonState.lastResult = null;
+
+                if (!comparisonState.groups.length) {
+                    comparisonState.groups = [createComparisonGroup({ clientSheet: clientSheetNames[0] || '' })];
+                } else {
+                    comparisonState.groups = comparisonState.groups.map((group) => createComparisonGroup({
+                        ...group,
+                        clientSheet: group.clientSheet && clientSheets[group.clientSheet] ? group.clientSheet : (clientSheetNames[0] || '')
+                    }));
+                }
+
+                renderComparisonGroups();
+                showStatus(status, `Headers loaded. Comparable master rows: ${masterRows.length} (Owner = Client). Client rows: ${allClientRows.length} across ${clientSheetNames.length} sheet(s). Configure the comparison groups and run export.`, 'success');
+            } catch (error) {
+                showStatus(status, `Error: ${error.message}`, 'error');
+            }
+        }
+
+        function normalizeIdentifier(value) {
+            if (value === null || value === undefined) return '';
+            return String(value).trim().toLowerCase();
+        }
+
+        function getOwnerColumnName(headers) {
+            return headers.find((header) => String(header).trim().toLowerCase() === 'owner') || '';
+        }
+
+        function filterMasterRowsForComparison(rows, headers) {
+            const ownerColumn = getOwnerColumnName(headers);
+            if (!ownerColumn) return rows;
+            return rows.filter((row) => normalizeIdentifier(row[ownerColumn]) === 'client');
+        }
+
+        function normalizeComparisonIdentifier(value, retailerName) {
+            const normalized = normalizeIdentifier(value);
+            if (!normalized) return '';
+            if (retailerName.toLowerCase().includes('lazada')) {
+                const shortCode = normalized.split('_')[0];
+                return shortCode || normalized;
+            }
+            return normalized;
+        }
+
+        function uniqueRowsByHeaders(rows, headers) {
+            const seen = new Set();
+            return rows.filter((row) => {
+                const key = headers.map((header) => String(row[header] ?? '')).join('\u241f');
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            });
+        }
+
+        function findProfiteroUrlColumn(headers) {
+            return headers.find((header) => String(header).trim().toLowerCase() === 'profitero url')
+                || headers.find((header) => String(header).toLowerCase().includes('profitero') && String(header).toLowerCase().includes('url'))
+                || headers.find((header) => /^\s*url\s/i.test(String(header)));
+        }
+
+        function getExistingProfiteroUrl(row, headers) {
+            const profiteroColumn = findProfiteroUrlColumn(headers);
+            return profiteroColumn ? (row[profiteroColumn] ?? '') : '';
+        }
+
+        function getMasterRowKey(row) {
+            return `master::${row.__sourceRowNumber || ''}::${normalizeIdentifier(JSON.stringify(row))}`;
+        }
+
+        function getClientRowKey(row) {
+            return row.__clientRowId || `client::${row.__clientSheet || ''}::${row.__clientRowNumber || ''}`;
+        }
+
+        function getUniqueRetailerNames(groups) {
+            return Array.from(new Set(groups.map((group, index) => group.retailerName.trim() || `Group ${index + 1}`)));
+        }
+
+        function buildStatusHeaders(retailerNames) {
+            return retailerNames.map((name) => `Status - ${name}`);
+        }
+
+        function applyStatusCellColors(worksheet, matrix, statusHeaders) {
+            if (!matrix.length) return;
+            const headerIndexMap = new Map(matrix[0].map((header, index) => [header, index]));
+            statusHeaders.forEach((header) => {
+                const columnIndex = headerIndexMap.get(header);
+                if (columnIndex === undefined) return;
+                for (let rowIndex = 1; rowIndex < matrix.length; rowIndex += 1) {
+                    const value = String(matrix[rowIndex][columnIndex] ?? '').toLowerCase();
+                    if (!value) continue;
+                    const cellAddress = XLSX.utils.encode_cell({ r: rowIndex, c: columnIndex });
+                    if (!worksheet[cellAddress]) continue;
+                    worksheet[cellAddress].s = worksheet[cellAddress].s || {};
+                    worksheet[cellAddress].s.font = { bold: true, color: { rgb: '1F1F1F' } };
+                    if (value === 'add') {
+                        worksheet[cellAddress].s.fill = { fgColor: { rgb: 'CDEFD8' } };
+                    } else if (value === 'remove') {
+                        worksheet[cellAddress].s.fill = { fgColor: { rgb: 'F6D1CF' } };
+                    } else if (value === 'tracked') {
+                        worksheet[cellAddress].s.fill = { fgColor: { rgb: 'E8EDF7' } };
+                    }
+                }
+            });
+        }
+
+        function collectDuplicateIdentifiers(rows, columnName, retailerName, sourceLabel) {
+            const counts = new Map();
+            rows.forEach((row) => {
+                const identifier = normalizeComparisonIdentifier(row[columnName], retailerName);
+                if (!identifier) return;
+                counts.set(identifier, (counts.get(identifier) || 0) + 1);
+            });
+            return Array.from(counts.entries())
+                .filter(([, count]) => count > 1)
+                .map(([identifier, count]) => ({
+                    severity: 'Medium',
+                    type: `${sourceLabel} duplicate identifier`,
+                    retailer: retailerName,
+                    detail: `${identifier} appears ${count} times in ${sourceLabel.toLowerCase()} data`
+                }));
+        }
+
+        function buildSummaryRows(result) {
+            const rows = [
+                ['Metric', 'Value'],
+                ['Comparison groups', result.validGroups.length],
+                ['Addition rows', result.additions.length],
+                ['Removal rows', result.removals.length],
+                ['Review cases', result.reviewCases.length],
+                ['Generated at', new Date().toLocaleString()]
+            ];
+
+            rows.push([]);
+            rows.push(['Retailer', 'Client Sheet', 'Matched', 'Add', 'Remove']);
+            result.groupSummaries.forEach((summary) => {
+                rows.push([summary.retailerName, summary.clientSheet, summary.matchedCount, summary.addCount, summary.removalCount]);
+            });
+            return rows;
+        }
+
+        function buildReviewCaseRows(reviewCases) {
+            return [
+                ['Severity', 'Type', 'Retailer', 'Detail'],
+                ...reviewCases.map((item) => [item.severity, item.type, item.retailer || '', item.detail])
+            ];
+        }
+
+        function buildJiraDraftText(result) {
+            const groupLines = result.groupSummaries.map((summary) =>
+                `- ${summary.retailerName} (${summary.clientSheet}): matched ${summary.matchedCount}, add ${summary.addCount}, remove ${summary.removalCount}`
+            ).join('\n');
+
+            const reviewLines = result.reviewCases.length
+                ? result.reviewCases.slice(0, 10).map((item) => `- [${item.severity}] ${item.type}: ${item.detail}`).join('\n')
+                : '- No review blockers detected';
+
+            return [
+                'Title: Update tracked assortment based on latest client file',
+                '',
+                'Summary:',
+                `- Comparison groups: ${result.validGroups.length}`,
+                `- Addition rows: ${result.additions.length}`,
+                `- Removal rows: ${result.removals.length}`,
+                `- Review cases: ${result.reviewCases.length}`,
+                '',
+                'Retailer breakdown:',
+                groupLines || '- No configured groups',
+                '',
+                'Source files:',
+                '- Master workbook cleaned automatically before comparison',
+                '- Comparison limited to Owner = Client rows when Owner column exists',
+                '- Lazada identifiers normalized using the short code before "_"',
+                '',
+                'Review notes:',
+                reviewLines,
+                '',
+                'Requested action:',
+                '- Process additions and removals from the attached source file',
+                '- Verify flagged review cases before final database update'
+            ].join('\n');
+        }
+
+        function buildAISummaryPayload(result) {
+            return {
+                generated_at: new Date().toISOString(),
+                comparison_groups: result.validGroups.length,
+                additions: result.additions.length,
+                removals: result.removals.length,
+                review_cases: result.reviewCases.length,
+                rules: [
+                    'Master workbook cleaned before comparison',
+                    'Only Owner = Client rows included when Owner column exists',
+                    'Lazada identifiers normalized by the short code before "_"',
+                    'Client sheet selection is sheet-specific for each comparison group',
+                    'Additions preserve the client row horizontally across retailers',
+                    'Existing Profitero URL is included for partially tracked addition rows'
+                ],
+                retailer_breakdown: result.groupSummaries.map((summary) => ({
+                    retailer: summary.retailerName,
+                    client_sheet: summary.clientSheet,
+                    master_identifier_column: summary.masterColumn,
+                    client_identifier_column: summary.clientColumn,
+                    matched: summary.matchedCount,
+                    add: summary.addCount,
+                    remove: summary.removalCount
+                })),
+                top_review_cases: result.reviewCases.slice(0, 20).map((item) => ({
+                    severity: item.severity,
+                    type: item.type,
+                    retailer: item.retailer || '',
+                    detail: item.detail
+                })),
+                sample_additions: result.additions.slice(0, 5),
+                sample_removals: result.removals.slice(0, 5)
+            };
+        }
+
+        function buildDeepSeekJiraPrompt(result) {
+            const payload = JSON.stringify(buildAISummaryPayload(result), null, 2);
+            return [
+                'You are helping a customer success operations specialist prepare a Jira ticket for a database update request.',
+                '',
+                'Your task:',
+                '1. Write a concise Jira title.',
+                '2. Write a structured Jira description for an internal operations team.',
+                '3. Include these sections in order: Background, Scope, Retailer Breakdown, Review Notes, Requested Action.',
+                '4. Be specific and operational, not fluffy.',
+                '5. If there are review cases, mention them clearly as items that need manual verification before final update.',
+                '6. Do not invent facts beyond the payload.',
+                '',
+                'Output format:',
+                '- Title: ...',
+                '- Description:',
+                '  Background:',
+                '  Scope:',
+                '  Retailer Breakdown:',
+                '  Review Notes:',
+                '  Requested Action:',
+                '',
+                'Payload:',
+                payload
+            ].join('\n');
+        }
+
+        function buildDeepSeekReviewPrompt(result) {
+            const payload = JSON.stringify(buildAISummaryPayload(result), null, 2);
+            return [
+                'You are assisting with review and QA of a workbook comparison result before a database update request is submitted.',
+                '',
+                'Your task:',
+                '1. Review the payload and identify the most important cases that need human verification.',
+                '2. Group them into: High Priority, Medium Priority, Low Priority.',
+                '3. Explain why each case matters in one short sentence.',
+                '4. Suggest the recommended next check for each group.',
+                '5. If the same type of issue appears repeatedly, summarize the pattern instead of repeating identical lines.',
+                '6. Keep the answer concise and operational.',
+                '',
+                'Output format:',
+                '- High Priority',
+                '- Medium Priority',
+                '- Low Priority',
+                '- Recommended Checks',
+                '',
+                'Payload:',
+                payload
+            ].join('\n');
+        }
+
+        function buildDeepSeekHandoffPrompt(result) {
+            const payload = JSON.stringify(buildAISummaryPayload(result), null, 2);
+            return [
+                'You are helping prepare an internal handoff note for a customer success operations workflow.',
+                '',
+                'Your task:',
+                '1. Write a short internal handoff summary for the operations team.',
+                '2. Include a one-paragraph executive summary.',
+                '3. Then include bullet lists for Additions, Removals, Partial Tracking, and Review Cases.',
+                '4. Then write a short note suitable to paste above a Google Sheet source file.',
+                '5. Keep the language professional, direct, and easy to scan.',
+                '6. Do not invent facts beyond the payload.',
+                '',
+                'Output format:',
+                '- Executive Summary',
+                '- Additions',
+                '- Removals',
+                '- Partial Tracking',
+                '- Review Cases',
+                '- Google Sheet Note',
+                '',
+                'Payload:',
+                payload
+            ].join('\n');
+        }
+
+        function showCopiedPrompt(title, promptText) {
+            const preview = document.getElementById('previewComparison');
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(promptText).catch(() => {});
+            }
+            showPreview(
+                preview,
+                `<div class="preview-title">${escapeHtml(title)}</div><div class="preview-row"><pre style="white-space: pre-wrap; font: inherit;">${escapeHtml(promptText)}</pre></div>`
+            );
+        }
+
+        function buildClientComparisonResult() {
+            if (!comparisonState.masterRows.length || !comparisonState.clientRows.length) {
+                throw new Error('Please load both master and client files first');
+            }
+            const validGroups = comparisonState.groups.filter((group) => group.masterColumn && group.clientSheet && group.clientColumn);
+            if (!validGroups.length) {
+                throw new Error('Please configure at least one comparison group with a master column, client sheet, and client identifier column');
+            }
+
+            const retailerNames = getUniqueRetailerNames(validGroups);
+            const additionStatusHeaders = buildStatusHeaders(retailerNames);
+            const removalStatusHeaders = buildStatusHeaders(retailerNames);
+            const additionEntries = new Map();
+            const removalEntries = new Map();
+            const groupSummaries = [];
+            const reviewCases = [];
+
+            validGroups.forEach((group, index) => {
+                const retailerName = group.retailerName.trim() || `Group ${index + 1}`;
+                const clientSheetConfig = comparisonState.clientSheets[group.clientSheet];
+                if (!clientSheetConfig) return;
+                reviewCases.push(
+                    ...collectDuplicateIdentifiers(comparisonState.masterRows, group.masterColumn, retailerName, 'Master'),
+                    ...collectDuplicateIdentifiers(clientSheetConfig.rows, group.clientColumn, retailerName, 'Client')
+                );
+                const masterMap = new Map();
+                comparisonState.masterRows.forEach((row) => {
+                    const identifier = normalizeComparisonIdentifier(row[group.masterColumn], retailerName);
+                    if (!identifier || masterMap.has(identifier)) return;
+                    masterMap.set(identifier, row);
+                });
+
+                const clientMap = new Map();
+                clientSheetConfig.rows.forEach((row) => {
+                    const identifier = normalizeComparisonIdentifier(row[group.clientColumn], retailerName);
+                    if (!identifier || clientMap.has(identifier)) return;
+                    clientMap.set(identifier, row);
+                });
+
+                let matchedCount = 0;
+                let addCount = 0;
+                let removalCount = 0;
+
+                clientMap.forEach((row, identifier) => {
+                    const clientRowKey = getClientRowKey(row);
+                    const statusHeader = `Status - ${retailerName}`;
+                    if (masterMap.has(identifier)) {
+                        matchedCount += 1;
+                        const matchedMasterRow = masterMap.get(identifier);
+                        const entry = additionEntries.get(clientRowKey) || {
+                            baseRow: row,
+                            existingProfiteroUrl: '',
+                            statuses: {}
+                        };
+                        entry.statuses[statusHeader] = entry.statuses[statusHeader] || 'Tracked';
+                        if (!entry.existingProfiteroUrl) {
+                            entry.existingProfiteroUrl = getExistingProfiteroUrl(matchedMasterRow, comparisonState.masterHeaders);
+                        }
+                        additionEntries.set(clientRowKey, entry);
+                        return;
+                    }
+
+                    addCount += 1;
+                    const entry = additionEntries.get(clientRowKey) || {
+                        baseRow: row,
+                        existingProfiteroUrl: '',
+                        statuses: {}
+                    };
+                    entry.statuses[statusHeader] = 'Add';
+                    additionEntries.set(clientRowKey, entry);
+                });
+
+                masterMap.forEach((row, identifier) => {
+                    if (clientMap.has(identifier)) return;
+                    removalCount += 1;
+                    const masterRowKey = getMasterRowKey(row);
+                    const statusHeader = `Status - ${retailerName}`;
+                    const entry = removalEntries.get(masterRowKey) || {
+                        baseRow: row,
+                        clientSheet: group.clientSheet,
+                        statuses: {}
+                    };
+                    entry.statuses[statusHeader] = 'Remove';
+                    removalEntries.set(masterRowKey, entry);
+                });
+
+                groupSummaries.push({
+                    retailerName,
+                    clientSheet: group.clientSheet,
+                    masterColumn: group.masterColumn,
+                    clientColumn: group.clientColumn,
+                    matchedCount,
+                    addCount,
+                    removalCount
+                });
+            });
+
+            const additions = Array.from(additionEntries.values())
+                .filter((entry) => Object.values(entry.statuses).some((value) => value === 'Add'))
+                .map((entry) => {
+                    const row = {
+                        'Existing Profitero URL': entry.existingProfiteroUrl,
+                        'Client Sheet': entry.baseRow.__clientSheet || ''
+                    };
+                    comparisonState.clientHeaders.forEach((header) => {
+                        row[header] = entry.baseRow[header] ?? '';
+                    });
+                    additionStatusHeaders.forEach((header) => {
+                        row[header] = entry.statuses[header] || '';
+                    });
+                    const hasTracked = Object.values(entry.statuses).some((value) => value === 'Tracked');
+                    const hasAdd = Object.values(entry.statuses).some((value) => value === 'Add');
+                    if (hasTracked && hasAdd && !entry.existingProfiteroUrl) {
+                        reviewCases.push({
+                            severity: 'High',
+                            type: 'Missing Profitero URL',
+                            retailer: '',
+                            detail: `Client row ${entry.baseRow.__clientRowId || ''} has partial tracking but no Profitero URL was found in master`
+                        });
+                    }
+                    if (hasTracked && hasAdd) {
+                        reviewCases.push({
+                            severity: 'Info',
+                            type: 'Partial retailer tracking',
+                            retailer: '',
+                            detail: `Client row ${entry.baseRow.__clientRowId || ''} is already tracked for some retailers and needs additional retailer coverage`
+                        });
+                    }
+                    return row;
+                });
+
+            const removals = Array.from(removalEntries.values()).map((entry) => {
+                const row = {
+                    'Client Sheet': entry.clientSheet || ''
+                };
+                comparisonState.masterHeaders.forEach((header) => {
+                    row[header] = entry.baseRow[header] ?? '';
+                });
+                removalStatusHeaders.forEach((header) => {
+                    row[header] = entry.statuses[header] || '';
+                });
+                return row;
+            });
+
+            const additionHeaders = ['Existing Profitero URL', 'Client Sheet', ...comparisonState.clientHeaders, ...additionStatusHeaders];
+            const removalHeaders = ['Client Sheet', ...comparisonState.masterHeaders, ...removalStatusHeaders];
+
+            return {
+                validGroups,
+                groupSummaries,
+                reviewCases,
+                additionHeaders,
+                removalHeaders,
+                additionStatusHeaders,
+                removalStatusHeaders,
+                additions: uniqueRowsByHeaders(additions, additionHeaders),
+                removals: uniqueRowsByHeaders(removals, removalHeaders)
+            };
+        }
+
+        async function processClientComparison() {
+            const status = document.getElementById('statusComparison');
+
+            try {
+                showStatus(status, 'Comparing files and building additions/removals sheets...', 'loading');
+                const result = buildClientComparisonResult();
+                comparisonState.lastResult = result;
+
+                const workbookOut = XLSX.utils.book_new();
+                const additionsMatrix = [result.additionHeaders, ...result.additions.map((row) => result.additionHeaders.map((header) => row[header] !== undefined ? row[header] : ''))];
+                const removalsMatrix = [result.removalHeaders, ...result.removals.map((row) => result.removalHeaders.map((header) => row[header] !== undefined ? row[header] : ''))];
+
+                const additionsSheet = XLSX.utils.aoa_to_sheet(additionsMatrix);
+                const removalsSheet = XLSX.utils.aoa_to_sheet(removalsMatrix);
+                applySheetStyles(additionsSheet, additionsMatrix);
+                applySheetStyles(removalsSheet, removalsMatrix);
+                applyStatusCellColors(additionsSheet, additionsMatrix, result.additionStatusHeaders);
+                applyStatusCellColors(removalsSheet, removalsMatrix, result.removalStatusHeaders);
+                XLSX.utils.book_append_sheet(workbookOut, additionsSheet, 'Additions');
+                XLSX.utils.book_append_sheet(workbookOut, removalsSheet, 'Removals');
+                XLSX.writeFile(workbookOut, 'client_file_comparison.xlsx');
+
+                showStatus(status, `Export complete. ${result.additions.length} additions and ${result.removals.length} removals were written across ${result.validGroups.length} comparison groups.`, 'success');
+            } catch (error) {
+                showStatus(status, `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function exportGoogleSheetReady() {
+            const status = document.getElementById('statusComparison');
+
+            try {
+                showStatus(status, 'Building Google Sheet ready workbook...', 'loading');
+                const result = buildClientComparisonResult();
+                comparisonState.lastResult = result;
+
+                const workbookOut = XLSX.utils.book_new();
+                const summaryMatrix = buildSummaryRows(result);
+                const additionsMatrix = [result.additionHeaders, ...result.additions.map((row) => result.additionHeaders.map((header) => row[header] !== undefined ? row[header] : ''))];
+                const removalsMatrix = [result.removalHeaders, ...result.removals.map((row) => result.removalHeaders.map((header) => row[header] !== undefined ? row[header] : ''))];
+                const reviewMatrix = buildReviewCaseRows(result.reviewCases);
+
+                const summarySheet = XLSX.utils.aoa_to_sheet(summaryMatrix);
+                const additionsSheet = XLSX.utils.aoa_to_sheet(additionsMatrix);
+                const removalsSheet = XLSX.utils.aoa_to_sheet(removalsMatrix);
+                const reviewSheet = XLSX.utils.aoa_to_sheet(reviewMatrix);
+
+                applySheetStyles(summarySheet, summaryMatrix);
+                applySheetStyles(additionsSheet, additionsMatrix);
+                applySheetStyles(removalsSheet, removalsMatrix);
+                applySheetStyles(reviewSheet, reviewMatrix);
+                applyStatusCellColors(additionsSheet, additionsMatrix, result.additionStatusHeaders);
+                applyStatusCellColors(removalsSheet, removalsMatrix, result.removalStatusHeaders);
+
+                XLSX.utils.book_append_sheet(workbookOut, summarySheet, 'Summary');
+                XLSX.utils.book_append_sheet(workbookOut, additionsSheet, 'Additions');
+                XLSX.utils.book_append_sheet(workbookOut, removalsSheet, 'Removals');
+                XLSX.utils.book_append_sheet(workbookOut, reviewSheet, 'Review Cases');
+                XLSX.writeFile(workbookOut, 'google_sheet_ready_comparison.xlsx');
+
+                showStatus(status, `Google Sheet ready export complete. Summary, additions, removals, and review cases were written.`, 'success');
+            } catch (error) {
+                showStatus(status, `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function generateJiraDraft() {
+            const preview = document.getElementById('previewComparison');
+
+            try {
+                const result = buildClientComparisonResult();
+                comparisonState.lastResult = result;
+                const draft = buildJiraDraftText(result);
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(draft).catch(() => {});
+                }
+                showPreview(
+                    preview,
+                    `<div class="preview-title">Jira draft</div><div class="preview-row"><pre style="white-space: pre-wrap; font: inherit;">${escapeHtml(draft)}</pre></div>`
+                );
+            } catch (error) {
+                showPreview(preview, `<div class="preview-title">Jira draft error</div><div class="preview-row">${escapeHtml(error.message)}</div>`);
+            }
+        }
+
+        async function generateDeepSeekJiraPrompt() {
+            try {
+                const result = buildClientComparisonResult();
+                comparisonState.lastResult = result;
+                showCopiedPrompt('DeepSeek Jira Prompt', buildDeepSeekJiraPrompt(result));
+            } catch (error) {
+                showPreview(
+                    document.getElementById('previewComparison'),
+                    `<div class="preview-title">DeepSeek Jira Prompt Error</div><div class="preview-row">${escapeHtml(error.message)}</div>`
+                );
+            }
+        }
+
+        async function generateDeepSeekReviewPrompt() {
+            try {
+                const result = buildClientComparisonResult();
+                comparisonState.lastResult = result;
+                showCopiedPrompt('DeepSeek Review Prompt', buildDeepSeekReviewPrompt(result));
+            } catch (error) {
+                showPreview(
+                    document.getElementById('previewComparison'),
+                    `<div class="preview-title">DeepSeek Review Prompt Error</div><div class="preview-row">${escapeHtml(error.message)}</div>`
+                );
+            }
+        }
+
+        async function generateDeepSeekHandoffPrompt() {
+            try {
+                const result = buildClientComparisonResult();
+                comparisonState.lastResult = result;
+                showCopiedPrompt('DeepSeek Handoff Prompt', buildDeepSeekHandoffPrompt(result));
+            } catch (error) {
+                showPreview(
+                    document.getElementById('previewComparison'),
+                    `<div class="preview-title">DeepSeek Handoff Prompt Error</div><div class="preview-row">${escapeHtml(error.message)}</div>`
+                );
+            }
+        }
+
+        async function showReviewCases() {
+            const preview = document.getElementById('previewComparison');
+
+            try {
+                const result = buildClientComparisonResult();
+                comparisonState.lastResult = result;
+                const content = result.reviewCases.length
+                    ? result.reviewCases.map((item, index) => `
+                        <div class="preview-row">
+                            <strong>Case ${index + 1}</strong><br>
+                            [${escapeHtml(item.severity)}] ${escapeHtml(item.type)}<br>
+                            ${escapeHtml(item.detail)}
+                        </div>
+                    `).join('')
+                    : '<div class="preview-row">No review cases detected.</div>';
+                showPreview(preview, `<div class="preview-title">Review cases</div>${content}`);
+            } catch (error) {
+                showPreview(preview, `<div class="preview-title">Review cases error</div><div class="preview-row">${escapeHtml(error.message)}</div>`);
+            }
+        }
+
+        async function previewClientComparison() {
+            const preview = document.getElementById('previewComparison');
+
+            try {
+                const result = buildClientComparisonResult();
+                comparisonState.lastResult = result;
+                const groupPreview = result.groupSummaries.map((summary) => `
+                    <div class="preview-row">
+                        <strong>${escapeHtml(summary.retailerName)}</strong><br>
+                        Sheet: ${escapeHtml(summary.clientSheet)}<br>
+                        Matched: ${summary.matchedCount} | Add: ${summary.addCount} | Remove: ${summary.removalCount}
+                    </div>
+                `).join('');
+                const additionPreview = result.additions.slice(0, 3).map((row, index) => `
+                    <div class="preview-row">
+                        <strong>Addition ${index + 1}</strong><br>
+                        Sheet: ${escapeHtml(row['Client Sheet'])}<br>
+                        Existing Profitero URL: ${escapeHtml(row['Existing Profitero URL'] || '')}
+                    </div>
+                `).join('');
+                const removalPreview = result.removals.slice(0, 3).map((row, index) => `
+                    <div class="preview-row">
+                        <strong>Removal ${index + 1}</strong><br>
+                        Sheet: ${escapeHtml(row['Client Sheet'])}<br>
+                        ${escapeHtml(result.removalHeaders.slice(0, 3).map((header) => `${header}: ${row[header] ?? ''}`).join(' | '))}
+                    </div>
+                `).join('');
+
+                showPreview(
+                    preview,
+                    `<div class="preview-title">Comparison preview</div>
+                     <div class="preview-row">Groups: ${result.validGroups.length} | Additions: ${result.additions.length} | Removals: ${result.removals.length}</div>
+                     ${groupPreview}
+                     ${additionPreview || '<div class="preview-row">No additions found.</div>'}
+                     ${removalPreview || '<div class="preview-row">No removals found.</div>'}`
+                );
+            } catch (error) {
+                showPreview(preview, `<div class="preview-title">Preview error</div><div class="preview-row">${escapeHtml(error.message)}</div>`);
+            }
         }
 
         async function processCategoriesHierarchy() {
