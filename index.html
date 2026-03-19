@@ -1783,8 +1783,17 @@
 
             const visibleAnchorIndex = headers.findIndex((_, index) => !hiddenIndices.includes(index));
             if (visibleAnchorIndex !== -1) {
-                worksheet['!freeze'] = { xSplit: visibleAnchorIndex, ySplit: 1, topLeftCell: XLSX.utils.encode_cell({ r: 1, c: visibleAnchorIndex }) };
-                worksheet['!pane'] = { state: 'frozen', xSplit: visibleAnchorIndex, ySplit: 1, topLeftCell: XLSX.utils.encode_cell({ r: 1, c: visibleAnchorIndex }), activePane: 'bottomRight' };
+                const topLeftCell = XLSX.utils.encode_cell({ r: 1, c: visibleAnchorIndex });
+                const existingView = Array.isArray(worksheet['!views']) && worksheet['!views'].length ? { ...worksheet['!views'][0] } : {};
+                worksheet['!views'] = [{
+                    ...existingView,
+                    zoomScale: existingView.zoomScale || 80,
+                    state: 'frozen',
+                    xSplit: visibleAnchorIndex,
+                    ySplit: 1,
+                    topLeftCell,
+                    activePane: 'bottomRight'
+                }];
             }
         }
 
