@@ -358,6 +358,30 @@
             color: var(--muted);
         }
 
+        .toggle-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 14px 16px;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.76);
+            border: 1px solid rgba(76, 57, 34, 0.08);
+        }
+
+        .toggle-row span {
+            font-size: 14px;
+            color: var(--text);
+            line-height: 1.5;
+        }
+
+        .toggle-row input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--accent);
+            flex-shrink: 0;
+        }
+
         input[type="text"],
         input[type="file"],
         .selector-trigger,
@@ -918,6 +942,27 @@
                         <div class="field-full">
                             <label for="basicCleanupFile">Workbook</label>
                             <input type="file" id="basicCleanupFile" accept=".xlsx,.xls">
+                        </div>
+                        <div class="field-grid" style="margin-top: 14px;">
+                            <div class="field-full">
+                                <label class="label">Cleanup Options</label>
+                                <div class="toggle-row">
+                                    <span>Keep <strong>Keywords</strong> sheet in the export</span>
+                                    <input type="checkbox" id="basicCleanupKeepKeywords" checked>
+                                </div>
+                            </div>
+                            <div class="field-full">
+                                <div class="toggle-row">
+                                    <span>Keep only product rows where <strong>Owner = Client</strong></span>
+                                    <input type="checkbox" id="basicCleanupOwnerClientOnly">
+                                </div>
+                            </div>
+                            <div class="field-full">
+                                <div class="toggle-row">
+                                    <span>Hide <strong>Profitero ID</strong> and <strong>Profitero URL</strong>, then freeze the next visible column</span>
+                                    <input type="checkbox" id="basicCleanupHideProfitero" checked>
+                                </div>
+                            </div>
                         </div>
                         <div class="actions">
                             <button class="btn btn-primary" onclick="processBasicCleanup()">Clean and Export</button>
@@ -1699,6 +1744,48 @@
             const ownerColumn = getOwnerColumnName(headers);
             if (!ownerColumn) return rows;
             return rows.filter((row) => normalizeIdentifier(row[ownerColumn]) === 'client');
+        }
+
+        function filterRowsByOwnerClient(rows, headers, clientOnly) {
+            if (!clientOnly) return rows;
+            const ownerColumn = getOwnerColumnName(headers);
+            if (!ownerColumn) return rows;
+            return rows.filter((row) => normalizeIdentifier(row[ownerColumn]) === 'client');
+        }
+
+        function getBasicCleanupOptions() {
+            return {
+                keepKeywords: document.getElementById('basicCleanupKeepKeywords').checked,
+                ownerClientOnly: document.getElementById('basicCleanupOwnerClientOnly').checked,
+                hideProfiteroColumns: document.getElementById('basicCleanupHideProfitero').checked
+            };
+        }
+
+        function applyProfiteroViewSettings(worksheet, headers, enabled) {
+            if (!enabled || !headers.length) return;
+            const normalizedHeaders = headers.map((header) => String(header).trim().toLowerCase());
+            const hiddenIndices = [];
+
+            normalizedHeaders.forEach((header, index) => {
+                if (header === 'profitero id' || header === 'profitero url') {
+                    hiddenIndices.push(index);
+                }
+            });
+
+            if (!hiddenIndices.length) return;
+
+            const existingCols = worksheet['!cols'] || headers.map(() => ({}));
+            worksheet['!cols'] = headers.map((_, index) => {
+                const colConfig = existingCols[index] ? { ...existingCols[index] } : {};
+                if (hiddenIndices.includes(index)) colConfig.hidden = true;
+                return colConfig;
+            });
+
+            const visibleAnchorIndex = headers.findIndex((_, index) => !hiddenIndices.includes(index));
+            if (visibleAnchorIndex !== -1) {
+                worksheet['!freeze'] = { xSplit: visibleAnchorIndex, ySplit: 1, topLeftCell: XLSX.utils.encode_cell({ r: 1, c: visibleAnchorIndex }) };
+                worksheet['!pane'] = { state: 'frozen', xSplit: visibleAnchorIndex, ySplit: 1, topLeftCell: XLSX.utils.encode_cell({ r: 1, c: visibleAnchorIndex }), activePane: 'bottomRight' };
+            }
         }
 
         function normalizeComparisonIdentifier(value, retailerName) {
@@ -2916,21 +3003,24 @@
 
             try {
                 showStatus(status, 'Cleaning workbook and preparing export...', 'loading');
+                const options = getBasicCleanupOptions();
                 const workbook = await readWorkbookFromInput(document.getElementById('basicCleanupFile'));
                 const productSheetName = findBestSheetName(workbook, ['product list', 'master', 'products']);
                 const keywordSheetName = findOptionalSheetName(workbook, ['search terms', 'keywords']);
                 const worksheet = workbook.Sheets[productSheetName];
                 const { headers, data } = processWorksheetData(worksheet, COLUMNS_TO_DROP);
-                const filteredRows = filterRowsWithContent(data, headers);
+                const contentRows = filterRowsWithContent(data, headers);
+                const filteredRows = filterRowsByOwnerClient(contentRows, headers, options.ownerClientOnly);
                 if (!filteredRows.length) throw new Error('All rows were removed because RPC and URL columns were empty');
 
                 const workbookOut = XLSX.utils.book_new();
                 const matrix = [headers, ...filteredRows.map((row) => headers.map((header) => row[header] !== undefined ? row[header] : ''))];
                 const worksheetOut = XLSX.utils.aoa_to_sheet(matrix);
                 applySheetStyles(worksheetOut, matrix);
+                applyProfiteroViewSettings(worksheetOut, headers, options.hideProfiteroColumns);
                 XLSX.utils.book_append_sheet(workbookOut, worksheetOut, 'Products');
 
-                if (keywordSheetName && workbook.Sheets[keywordSheetName]) {
+                if (options.keepKeywords && keywordSheetName && workbook.Sheets[keywordSheetName]) {
                     const keywordRows = XLSX.utils.sheet_to_json(workbook.Sheets[keywordSheetName], { defval: '' });
                     if (keywordRows.length) {
                         XLSX.utils.book_append_sheet(workbookOut, XLSX.utils.json_to_sheet(keywordRows), 'Keywords');
@@ -2938,7 +3028,7 @@
                 }
 
                 XLSX.writeFile(workbookOut, 'master_list_cleaned.xlsx');
-                showStatus(status, `Export complete. ${filteredRows.length} cleaned rows were written.`, 'success');
+                showStatus(status, `Export complete. ${filteredRows.length} cleaned rows were written.${options.ownerClientOnly ? ' Owner = Client filter applied.' : ''}${options.keepKeywords ? ' Keywords sheet kept.' : ' Keywords sheet excluded.'}`, 'success');
             } catch (error) {
                 showStatus(status, `Error: ${error.message}`, 'error');
             }
@@ -2948,16 +3038,18 @@
             const preview = document.getElementById('previewBasicCleanup');
 
             try {
+                const options = getBasicCleanupOptions();
                 const workbook = await readWorkbookFromInput(document.getElementById('basicCleanupFile'));
                 const productSheetName = findBestSheetName(workbook, ['product list', 'master', 'products']);
                 const worksheet = workbook.Sheets[productSheetName];
                 const { headers, data } = processWorksheetData(worksheet, COLUMNS_TO_DROP);
-                const filteredRows = filterRowsWithContent(data, headers);
+                const contentRows = filterRowsWithContent(data, headers);
+                const filteredRows = filterRowsByOwnerClient(contentRows, headers, options.ownerClientOnly);
                 const sampleRows = filteredRows.slice(0, 5).map((row, index) => `
                     <div class="preview-row"><strong>Row ${index + 1}</strong><br>${escapeHtml(headers.map((header) => `${header}: ${row[header] ?? ''}`).join(' | '))}</div>
                 `).join('');
 
-                showPreview(preview, `<div class="preview-title">Preview of cleaned product rows</div>${sampleRows || '<div class="preview-row">No rows remain after cleanup.</div>'}`);
+                showPreview(preview, `<div class="preview-title">Preview of cleaned product rows</div><div class="preview-row">Rows after cleanup: ${filteredRows.length}${options.ownerClientOnly ? ' | Owner = Client only' : ''}${options.keepKeywords ? ' | Keywords sheet will be kept' : ' | Products sheet only'}</div>${sampleRows || '<div class="preview-row">No rows remain after cleanup.</div>'}`);
             } catch (error) {
                 showPreview(preview, `<div class="preview-title">Preview error</div><div class="preview-row">${escapeHtml(error.message)}</div>`);
             }
