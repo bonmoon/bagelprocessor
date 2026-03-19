@@ -692,6 +692,45 @@
             margin-top: 14px;
         }
 
+        .subsection {
+            margin-top: 18px;
+            padding-top: 18px;
+            border-top: 1px solid rgba(76, 57, 34, 0.08);
+        }
+
+        .subsection:first-of-type {
+            margin-top: 0;
+            padding-top: 0;
+            border-top: none;
+        }
+
+        .subsection-title {
+            font-size: 15px;
+            font-weight: 800;
+            color: var(--accent-strong);
+            margin-bottom: 8px;
+        }
+
+        .subsection-copy {
+            font-size: 13px;
+            color: var(--muted);
+            line-height: 1.7;
+            margin-bottom: 12px;
+        }
+
+        .checklist-box {
+            padding: 14px;
+            border-radius: 14px;
+            border: 1px solid rgba(76, 57, 34, 0.08);
+            background: rgba(255, 255, 255, 0.76);
+            max-height: 220px;
+            overflow: auto;
+        }
+
+        .checklist-box .option-item {
+            margin-bottom: 8px;
+        }
+
         .btn-subtle {
             background: rgba(31, 106, 93, 0.1);
             color: var(--accent-strong);
@@ -1014,7 +1053,7 @@
                     <div class="feature-list">
                         <div class="feature-badge">Raw master upload supported</div>
                         <div class="feature-badge">Multi-group comparison</div>
-                        <div class="feature-badge">Additions and removals export</div>
+                        <div class="feature-badge">Change detection and enrichment</div>
                     </div>
                     <div class="panel">
                         <div class="field-grid">
@@ -1051,16 +1090,43 @@
                             <button class="btn btn-subtle" type="button" onclick="addComparisonGroup()">Add Comparison Group</button>
                             <button class="btn btn-subtle" type="button" onclick="addSuggestedComparisonGroups()">Add Suggested Retailers</button>
                         </div>
-                        <div id="comparisonConfigList" class="config-list"></div>
-                        <div class="actions">
-                            <button class="btn btn-primary" onclick="processClientComparison()">Compare and Export</button>
-                            <button class="btn" onclick="previewClientComparison()">Preview Result</button>
-                            <button class="btn" onclick="exportGoogleSheetReady()">Export Google Sheet Ready</button>
-                            <button class="btn" onclick="generateJiraDraft()">Generate Jira Draft</button>
-                            <button class="btn" onclick="showReviewCases()">Review Cases</button>
-                            <button class="btn" onclick="generateDeepSeekJiraPrompt()">DeepSeek Jira Prompt</button>
-                            <button class="btn" onclick="generateDeepSeekReviewPrompt()">DeepSeek Review Prompt</button>
-                            <button class="btn" onclick="generateDeepSeekHandoffPrompt()">DeepSeek Handoff Prompt</button>
+                        <div class="subsection">
+                            <div class="subsection-title">Change Detection</div>
+                            <div class="subsection-copy">Configure retailer groups to find additions and removals, then prepare operations outputs and internal notes.</div>
+                            <div id="comparisonConfigList" class="config-list"></div>
+                            <div class="actions">
+                                <button class="btn btn-primary" onclick="processClientComparison()">Export Add / Remove</button>
+                                <button class="btn" onclick="previewClientComparison()">Preview</button>
+                                <button class="btn" onclick="exportGoogleSheetReady()">Google Sheet Ready</button>
+                                <button class="btn" onclick="generateJiraDraft()">Jira Draft</button>
+                                <button class="btn" onclick="showReviewCases()">Review Cases</button>
+                            </div>
+                        </div>
+                        <div class="subsection">
+                            <div class="subsection-title">Master Lookup Enrichment</div>
+                            <div class="subsection-copy">Use one client column as the lookup key, search one or more master columns, and merge selected master values back into the client file. Rows without a match are marked as not found.</div>
+                            <div class="field-grid">
+                                <div class="field">
+                                    <label>Client sheet</label>
+                                    <select class="select-input" id="lookupClientSheet" onchange="updateLookupConfig('clientSheet', this.value)"></select>
+                                </div>
+                                <div class="field">
+                                    <label>Client identifier column</label>
+                                    <select class="select-input" id="lookupClientColumn" onchange="updateLookupConfig('clientColumn', this.value)"></select>
+                                </div>
+                                <div class="field-full">
+                                    <label>Master match columns</label>
+                                    <div id="lookupMasterMatchColumns" class="checklist-box"></div>
+                                </div>
+                                <div class="field-full">
+                                    <label>Master output columns</label>
+                                    <div id="lookupMasterOutputColumns" class="checklist-box"></div>
+                                </div>
+                            </div>
+                            <div class="actions">
+                                <button class="btn btn-primary" onclick="processMasterLookup()">Export Lookup Result</button>
+                                <button class="btn" onclick="previewMasterLookup()">Preview</button>
+                            </div>
                         </div>
                         <div id="statusComparison" class="status"></div>
                         <div id="previewComparison" class="preview"></div>
@@ -1198,6 +1264,12 @@
             clientRows: [],
             retailerOptions: [],
             groups: [],
+            lookupConfig: {
+                clientSheet: '',
+                clientColumn: '',
+                masterMatchColumns: new Set(),
+                masterOutputColumns: new Set()
+            },
             lastResult: null
         };
         const qaState = {
@@ -1463,6 +1535,45 @@
             document.getElementById('comparisonGroupCount').textContent = String(comparisonState.groups.length);
         }
 
+        function updateLookupConfig(field, value) {
+            comparisonState.lookupConfig[field] = value;
+            renderLookupControls();
+        }
+
+        function toggleLookupSet(field, value, checked) {
+            const set = comparisonState.lookupConfig[field];
+            if (!(set instanceof Set)) return;
+            if (checked) set.add(value);
+            else set.delete(value);
+        }
+
+        function renderChecklist(containerId, options, selectedSet, field) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            if (!options.length) {
+                container.innerHTML = '<div class="preview-row">Load files to see available columns.</div>';
+                return;
+            }
+            container.innerHTML = options.map((option) => `
+                <label class="option-item">
+                    <input type="checkbox" ${selectedSet.has(option) ? 'checked' : ''} onchange="toggleLookupSet('${field}', '${escapeJs(option)}', this.checked)">
+                    <span>${escapeHtml(option)}</span>
+                </label>
+            `).join('');
+        }
+
+        function renderLookupControls() {
+            const sheetNames = comparisonState.clientSheetNames;
+            const clientSheet = comparisonState.lookupConfig.clientSheet;
+            const clientHeaders = clientSheet && comparisonState.clientSheets[clientSheet]
+                ? comparisonState.clientSheets[clientSheet].headers
+                : [];
+            document.getElementById('lookupClientSheet').innerHTML = buildSelectOptions(sheetNames, clientSheet, 'Choose client sheet');
+            document.getElementById('lookupClientColumn').innerHTML = buildSelectOptions(clientHeaders, comparisonState.lookupConfig.clientColumn, 'Choose client identifier');
+            renderChecklist('lookupMasterMatchColumns', comparisonState.masterHeaders, comparisonState.lookupConfig.masterMatchColumns, 'masterMatchColumns');
+            renderChecklist('lookupMasterOutputColumns', comparisonState.masterHeaders, comparisonState.lookupConfig.masterOutputColumns, 'masterOutputColumns');
+        }
+
         function createComparisonGroup(seed = {}) {
             return {
                 id: seed.id || `cmp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
@@ -1714,6 +1825,14 @@
                 comparisonState.clientRows = allClientRows;
                 comparisonState.retailerOptions = Object.keys(getRetailerMapFromHeaders(masterProcessed.headers)).sort((a, b) => a.localeCompare(b));
                 comparisonState.lastResult = null;
+                comparisonState.lookupConfig = {
+                    clientSheet: comparisonState.lookupConfig.clientSheet && clientSheets[comparisonState.lookupConfig.clientSheet]
+                        ? comparisonState.lookupConfig.clientSheet
+                        : (clientSheetNames[0] || ''),
+                    clientColumn: '',
+                    masterMatchColumns: new Set(),
+                    masterOutputColumns: new Set()
+                };
 
                 if (!comparisonState.groups.length) {
                     comparisonState.groups = [createComparisonGroup({ clientSheet: clientSheetNames[0] || '' })];
@@ -1725,6 +1844,7 @@
                 }
 
                 renderComparisonGroups();
+                renderLookupControls();
                 showStatus(status, `Headers loaded. Comparable master rows: ${masterRows.length} (Owner = Client). Client rows: ${allClientRows.length} across ${clientSheetNames.length} sheet(s). Configure the comparison groups and run export.`, 'success');
             } catch (error) {
                 showStatus(status, `Error: ${error.message}`, 'error');
@@ -1784,15 +1904,17 @@
             const visibleAnchorIndex = headers.findIndex((_, index) => !hiddenIndices.includes(index));
             if (visibleAnchorIndex !== -1) {
                 const topLeftCell = XLSX.utils.encode_cell({ r: 1, c: visibleAnchorIndex });
+                worksheet['!freeze'] = {
+                    xSplit: String(visibleAnchorIndex),
+                    ySplit: '1',
+                    topLeftCell,
+                    activePane: 'bottomRight',
+                    state: 'frozen'
+                };
                 const existingView = Array.isArray(worksheet['!views']) && worksheet['!views'].length ? { ...worksheet['!views'][0] } : {};
                 worksheet['!views'] = [{
                     ...existingView,
-                    zoomScale: existingView.zoomScale || 80,
-                    state: 'frozen',
-                    xSplit: visibleAnchorIndex,
-                    ySplit: 1,
-                    topLeftCell,
-                    activePane: 'bottomRight'
+                    zoomScale: existingView.zoomScale || 80
                 }];
             }
         }
@@ -1943,129 +2065,6 @@
                 '- Process additions and removals from the attached source file',
                 '- Verify flagged review cases before final database update'
             ].join('\n');
-        }
-
-        function buildAISummaryPayload(result) {
-            return {
-                generated_at: new Date().toISOString(),
-                comparison_groups: result.validGroups.length,
-                additions: result.additions.length,
-                removals: result.removals.length,
-                review_cases: result.reviewCases.length,
-                rules: [
-                    'Master workbook cleaned before comparison',
-                    'Only Owner = Client rows included when Owner column exists',
-                    'Lazada identifiers normalized by the short code before "_"',
-                    'Client sheet selection is sheet-specific for each comparison group',
-                    'Additions preserve the client row horizontally across retailers',
-                    'Existing Profitero URL is included for partially tracked addition rows'
-                ],
-                retailer_breakdown: result.groupSummaries.map((summary) => ({
-                    retailer: summary.retailerName,
-                    client_sheet: summary.clientSheet,
-                    master_identifier_column: summary.masterColumn,
-                    client_identifier_column: summary.clientColumn,
-                    matched: summary.matchedCount,
-                    add: summary.addCount,
-                    remove: summary.removalCount
-                })),
-                top_review_cases: result.reviewCases.slice(0, 20).map((item) => ({
-                    severity: item.severity,
-                    type: item.type,
-                    retailer: item.retailer || '',
-                    detail: item.detail
-                })),
-                sample_additions: result.additions.slice(0, 5),
-                sample_removals: result.removals.slice(0, 5)
-            };
-        }
-
-        function buildDeepSeekJiraPrompt(result) {
-            const payload = JSON.stringify(buildAISummaryPayload(result), null, 2);
-            return [
-                'You are helping a customer success operations specialist prepare a Jira ticket for a database update request.',
-                '',
-                'Your task:',
-                '1. Write a concise Jira title.',
-                '2. Write a structured Jira description for an internal operations team.',
-                '3. Include these sections in order: Background, Scope, Retailer Breakdown, Review Notes, Requested Action.',
-                '4. Be specific and operational, not fluffy.',
-                '5. If there are review cases, mention them clearly as items that need manual verification before final update.',
-                '6. Do not invent facts beyond the payload.',
-                '',
-                'Output format:',
-                '- Title: ...',
-                '- Description:',
-                '  Background:',
-                '  Scope:',
-                '  Retailer Breakdown:',
-                '  Review Notes:',
-                '  Requested Action:',
-                '',
-                'Payload:',
-                payload
-            ].join('\n');
-        }
-
-        function buildDeepSeekReviewPrompt(result) {
-            const payload = JSON.stringify(buildAISummaryPayload(result), null, 2);
-            return [
-                'You are assisting with review and QA of a workbook comparison result before a database update request is submitted.',
-                '',
-                'Your task:',
-                '1. Review the payload and identify the most important cases that need human verification.',
-                '2. Group them into: High Priority, Medium Priority, Low Priority.',
-                '3. Explain why each case matters in one short sentence.',
-                '4. Suggest the recommended next check for each group.',
-                '5. If the same type of issue appears repeatedly, summarize the pattern instead of repeating identical lines.',
-                '6. Keep the answer concise and operational.',
-                '',
-                'Output format:',
-                '- High Priority',
-                '- Medium Priority',
-                '- Low Priority',
-                '- Recommended Checks',
-                '',
-                'Payload:',
-                payload
-            ].join('\n');
-        }
-
-        function buildDeepSeekHandoffPrompt(result) {
-            const payload = JSON.stringify(buildAISummaryPayload(result), null, 2);
-            return [
-                'You are helping prepare an internal handoff note for a customer success operations workflow.',
-                '',
-                'Your task:',
-                '1. Write a short internal handoff summary for the operations team.',
-                '2. Include a one-paragraph executive summary.',
-                '3. Then include bullet lists for Additions, Removals, Partial Tracking, and Review Cases.',
-                '4. Then write a short note suitable to paste above a Google Sheet source file.',
-                '5. Keep the language professional, direct, and easy to scan.',
-                '6. Do not invent facts beyond the payload.',
-                '',
-                'Output format:',
-                '- Executive Summary',
-                '- Additions',
-                '- Removals',
-                '- Partial Tracking',
-                '- Review Cases',
-                '- Google Sheet Note',
-                '',
-                'Payload:',
-                payload
-            ].join('\n');
-        }
-
-        function showCopiedPrompt(title, promptText) {
-            const preview = document.getElementById('previewComparison');
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(promptText).catch(() => {});
-            }
-            showPreview(
-                preview,
-                `<div class="preview-title">${escapeHtml(title)}</div><div class="preview-row"><pre style="white-space: pre-wrap; font: inherit;">${escapeHtml(promptText)}</pre></div>`
-            );
         }
 
         function buildClientComparisonResult() {
@@ -2313,45 +2312,6 @@
             }
         }
 
-        async function generateDeepSeekJiraPrompt() {
-            try {
-                const result = buildClientComparisonResult();
-                comparisonState.lastResult = result;
-                showCopiedPrompt('DeepSeek Jira Prompt', buildDeepSeekJiraPrompt(result));
-            } catch (error) {
-                showPreview(
-                    document.getElementById('previewComparison'),
-                    `<div class="preview-title">DeepSeek Jira Prompt Error</div><div class="preview-row">${escapeHtml(error.message)}</div>`
-                );
-            }
-        }
-
-        async function generateDeepSeekReviewPrompt() {
-            try {
-                const result = buildClientComparisonResult();
-                comparisonState.lastResult = result;
-                showCopiedPrompt('DeepSeek Review Prompt', buildDeepSeekReviewPrompt(result));
-            } catch (error) {
-                showPreview(
-                    document.getElementById('previewComparison'),
-                    `<div class="preview-title">DeepSeek Review Prompt Error</div><div class="preview-row">${escapeHtml(error.message)}</div>`
-                );
-            }
-        }
-
-        async function generateDeepSeekHandoffPrompt() {
-            try {
-                const result = buildClientComparisonResult();
-                comparisonState.lastResult = result;
-                showCopiedPrompt('DeepSeek Handoff Prompt', buildDeepSeekHandoffPrompt(result));
-            } catch (error) {
-                showPreview(
-                    document.getElementById('previewComparison'),
-                    `<div class="preview-title">DeepSeek Handoff Prompt Error</div><div class="preview-row">${escapeHtml(error.message)}</div>`
-                );
-            }
-        }
-
         async function showReviewCases() {
             const preview = document.getElementById('previewComparison');
 
@@ -2411,6 +2371,139 @@
                 );
             } catch (error) {
                 showPreview(preview, `<div class="preview-title">Preview error</div><div class="preview-row">${escapeHtml(error.message)}</div>`);
+            }
+        }
+
+        function buildMasterLookupResult() {
+            if (!comparisonState.masterRows.length || !comparisonState.clientRows.length) {
+                throw new Error('Please load both master and client files first');
+            }
+
+            const config = comparisonState.lookupConfig;
+            if (!config.clientSheet || !config.clientColumn) {
+                throw new Error('Please choose a client sheet and client identifier column for lookup');
+            }
+            if (!config.masterMatchColumns.size) {
+                throw new Error('Please choose at least one master match column');
+            }
+            if (!config.masterOutputColumns.size) {
+                throw new Error('Please choose at least one master output column');
+            }
+
+            const clientSheetConfig = comparisonState.clientSheets[config.clientSheet];
+            if (!clientSheetConfig) {
+                throw new Error('The selected client sheet is not available');
+            }
+
+            const matchColumns = Array.from(config.masterMatchColumns);
+            const outputColumns = Array.from(config.masterOutputColumns);
+            const lookupMaps = matchColumns.map((column) => {
+                const map = new Map();
+                comparisonState.masterRows.forEach((row) => {
+                    const identifier = normalizeVerificationIdentifier(row[column], column);
+                    if (!identifier || map.has(identifier)) return;
+                    map.set(identifier, row);
+                });
+                return { column, map };
+            });
+
+            const resultRows = clientSheetConfig.rows.map((clientRow) => {
+                const identifier = normalizeIdentifier(clientRow[config.clientColumn]);
+                let matchedRow = null;
+                let matchedColumn = '';
+                if (identifier) {
+                    for (const entry of lookupMaps) {
+                        const directMatch = entry.map.get(identifier);
+                        if (directMatch) {
+                            matchedRow = directMatch;
+                            matchedColumn = entry.column;
+                            break;
+                        }
+                    }
+                }
+
+                const row = {
+                    'Lookup Status': matchedRow ? 'Matched' : 'Not Found',
+                    'Lookup Matched Column': matchedColumn || '',
+                    'Lookup Identifier': clientRow[config.clientColumn] ?? ''
+                };
+                outputColumns.forEach((column) => {
+                    row[`Master ${column}`] = matchedRow ? (matchedRow[column] ?? '') : '';
+                });
+                clientSheetConfig.headers.forEach((header) => {
+                    row[header] = clientRow[header] ?? '';
+                });
+                return row;
+            });
+
+            const headers = [
+                'Lookup Status',
+                'Lookup Matched Column',
+                'Lookup Identifier',
+                ...outputColumns.map((column) => `Master ${column}`),
+                ...clientSheetConfig.headers
+            ];
+
+            const counts = resultRows.reduce((acc, row) => {
+                acc[row['Lookup Status']] = (acc[row['Lookup Status']] || 0) + 1;
+                return acc;
+            }, {});
+
+            return {
+                headers,
+                rows: resultRows,
+                counts
+            };
+        }
+
+        function applyLookupStatusColors(worksheet, matrix) {
+            const statusIndex = matrix[0].indexOf('Lookup Status');
+            if (statusIndex === -1) return;
+            for (let rowIndex = 1; rowIndex < matrix.length; rowIndex += 1) {
+                const value = String(matrix[rowIndex][statusIndex] ?? '').toLowerCase();
+                if (!value) continue;
+                const cellAddress = XLSX.utils.encode_cell({ r: rowIndex, c: statusIndex });
+                if (!worksheet[cellAddress]) continue;
+                worksheet[cellAddress].s = worksheet[cellAddress].s || {};
+                worksheet[cellAddress].s.font = { bold: true, color: { rgb: '1F1F1F' } };
+                if (value === 'matched') worksheet[cellAddress].s.fill = { fgColor: { rgb: 'CDEFD8' } };
+                if (value === 'not found') worksheet[cellAddress].s.fill = { fgColor: { rgb: 'F6D1CF' } };
+            }
+        }
+
+        async function processMasterLookup() {
+            const status = document.getElementById('statusComparison');
+            try {
+                showStatus(status, 'Looking up client rows against selected master columns...', 'loading');
+                const result = buildMasterLookupResult();
+                const matrix = [result.headers, ...result.rows.map((row) => result.headers.map((header) => row[header] !== undefined ? row[header] : ''))];
+                const workbookOut = XLSX.utils.book_new();
+                const worksheetOut = XLSX.utils.aoa_to_sheet(matrix);
+                applySheetStyles(worksheetOut, matrix);
+                applyLookupStatusColors(worksheetOut, matrix);
+                XLSX.utils.book_append_sheet(workbookOut, worksheetOut, 'Master Lookup');
+                XLSX.writeFile(workbookOut, 'master_lookup_enrichment.xlsx');
+                showStatus(status, `Lookup export complete. Matched: ${result.counts['Matched'] || 0}. Not Found: ${result.counts['Not Found'] || 0}.`, 'success');
+            } catch (error) {
+                showStatus(status, `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function previewMasterLookup() {
+            const preview = document.getElementById('previewComparison');
+            try {
+                const result = buildMasterLookupResult();
+                const rows = result.rows.slice(0, 5).map((row, index) => `
+                    <div class="preview-row">
+                        <strong>Lookup Row ${index + 1}</strong><br>
+                        Status: ${escapeHtml(row['Lookup Status'])}<br>
+                        Identifier: ${escapeHtml(row['Lookup Identifier'])}<br>
+                        Matched Column: ${escapeHtml(row['Lookup Matched Column'] || '')}
+                    </div>
+                `).join('');
+                showPreview(preview, `<div class="preview-title">Master lookup preview</div><div class="preview-row">Matched: ${result.counts['Matched'] || 0} | Not Found: ${result.counts['Not Found'] || 0}</div>${rows}`);
+            } catch (error) {
+                showPreview(preview, `<div class="preview-title">Master lookup error</div><div class="preview-row">${escapeHtml(error.message)}</div>`);
             }
         }
 
