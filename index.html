@@ -35,6 +35,10 @@
             padding: 0;
         }
 
+        html {
+            scroll-behavior: smooth;
+        }
+
         body {
             font-family: 'Manrope', sans-serif;
             background:
@@ -65,7 +69,7 @@
         .hero {
             position: relative;
             overflow: hidden;
-            padding: 36px;
+            padding: 24px 28px;
             border-radius: 32px;
             border: 1px solid rgba(255, 255, 255, 0.55);
             background:
@@ -87,11 +91,7 @@
         }
 
         .hero-top {
-            display: flex;
-            justify-content: space-between;
-            gap: 20px;
-            align-items: flex-start;
-            margin-bottom: 26px;
+            display: block;
         }
 
         .eyebrow {
@@ -109,24 +109,21 @@
         }
 
         .hero h1 {
-            font-size: clamp(2.4rem, 4vw, 4.2rem);
-            line-height: 0.96;
+            font-size: clamp(2rem, 3.4vw, 3rem);
+            line-height: 1.02;
             max-width: 760px;
-            margin: 18px 0 16px;
+            margin: 12px 0 6px;
         }
 
         .hero p {
             max-width: 680px;
             font-size: 1rem;
-            line-height: 1.7;
+            line-height: 1.45;
             color: rgba(255, 249, 241, 0.82);
         }
 
         .hero-meta {
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-            margin-top: 24px;
+            display: none;
         }
 
         .meta-pill {
@@ -139,9 +136,7 @@
         }
 
         .hero-side {
-            min-width: 260px;
-            display: grid;
-            gap: 12px;
+            display: none;
         }
 
         .hero-side-card {
@@ -172,6 +167,229 @@
             border: 1px solid rgba(255, 255, 255, 0.65);
             backdrop-filter: blur(10px);
             box-shadow: var(--shadow);
+        }
+
+        .guide-accordion {
+            margin-top: 24px;
+            border-radius: var(--radius-xl);
+            background: var(--surface);
+            border: 1px solid rgba(255, 255, 255, 0.65);
+            backdrop-filter: blur(10px);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            scroll-margin-top: 132px;
+        }
+
+        .guide-accordion summary {
+            list-style: none;
+            cursor: pointer;
+            padding: 22px 28px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        .guide-accordion summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .guide-accordion-body {
+            padding: 0 28px 28px;
+        }
+
+        .guide-summary-copy {
+            color: var(--muted);
+            font-size: 14px;
+            line-height: 1.7;
+            margin-top: 4px;
+        }
+
+        .group-ribbon {
+            margin-top: 24px;
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 14px;
+            position: sticky;
+            top: 12px;
+            z-index: 15;
+        }
+
+        .group-chip {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 18px;
+            padding: 18px 20px 18px 86px;
+            border-radius: 28px;
+            border: 1px solid rgba(255, 255, 255, 0.7);
+            color: #fffaf0;
+            text-decoration: none;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            min-height: 108px;
+            isolation: isolate;
+        }
+
+        .group-chip::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background:
+                linear-gradient(135deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04)),
+                radial-gradient(circle at 18% 20%, rgba(255, 255, 255, 0.24), transparent 28%);
+            pointer-events: none;
+        }
+
+        .group-chip:hover {
+            transform: translateY(-2px);
+        }
+
+        .group-chip[data-tone="category"] { background: linear-gradient(135deg, #35539a, #2c4a8f); }
+        .group-chip[data-tone="master"] { background: linear-gradient(135deg, #c99672, #b8825f); }
+        .group-chip[data-tone="comparison"] { background: linear-gradient(135deg, #dfb08a, #d18f73); }
+        .group-chip[data-tone="removal"] { background: linear-gradient(135deg, #a6bc84, #88a864); }
+        .group-chip[data-tone="guide"] { background: linear-gradient(135deg, #d39a58, #c67a46); }
+
+        .group-chip-thumb {
+            position: absolute;
+            left: 12px;
+            bottom: 6px;
+            width: 92px;
+            height: 92px;
+            border-radius: 24px;
+            background: transparent;
+            background-size: cover;
+            background-position: center;
+            flex-shrink: 0;
+            filter: drop-shadow(0 14px 16px rgba(44, 31, 15, 0.18));
+            z-index: 1;
+        }
+
+        .group-chip[data-tone="category"] .group-chip-thumb { background-image: url('Assets/1.png'); }
+        .group-chip[data-tone="master"] .group-chip-thumb { background-image: url('Assets/2.png'); }
+        .group-chip[data-tone="comparison"] .group-chip-thumb { background-image: url('Assets/3.png'); }
+        .group-chip[data-tone="removal"] .group-chip-thumb { background-image: url('Assets/4.png'); }
+        .group-chip[data-tone="guide"] .group-chip-thumb { background-image: url('Assets/1.png'); }
+
+        .group-chip-copy {
+            position: relative;
+            z-index: 1;
+            max-width: 170px;
+        }
+
+        .group-chip-copy strong {
+            display: block;
+            font-size: 16px;
+            margin-bottom: 4px;
+        }
+
+        .group-chip-copy span {
+            display: block;
+            font-size: 12px;
+            color: rgba(255, 250, 240, 0.82);
+            line-height: 1.5;
+        }
+
+        .group-chip-arrow {
+            position: relative;
+            z-index: 1;
+            font-size: 22px;
+            line-height: 1;
+            color: rgba(255, 249, 241, 0.86);
+        }
+
+        .module-groups {
+            display: grid;
+            gap: 24px;
+            margin-top: 24px;
+        }
+
+        .module-group {
+            padding: 22px;
+            border-radius: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.65);
+            background: rgba(255, 251, 245, 0.76);
+            backdrop-filter: blur(12px);
+            box-shadow: var(--shadow);
+            position: relative;
+            overflow: hidden;
+            scroll-margin-top: 132px;
+        }
+
+        .module-group::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            opacity: 0.26;
+            pointer-events: none;
+            background-repeat: no-repeat;
+            background-position: right -36px top -26px;
+            background-size: 240px;
+        }
+
+        .module-group-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 18px;
+            margin-bottom: 18px;
+            padding-bottom: 14px;
+            border-bottom: 1px solid rgba(76, 57, 34, 0.08);
+        }
+
+        .module-group-heading {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .module-group-illustration {
+            width: 64px;
+            height: 64px;
+            border-radius: 22px;
+            background-size: cover;
+            background-position: center;
+            border: 1px solid rgba(76, 57, 34, 0.08);
+        }
+
+        .module-group[data-group="category"] .module-group-illustration { background-image: url('Assets/1.png'); }
+        .module-group[data-group="master"] .module-group-illustration { background-image: url('Assets/2.png'); }
+        .module-group[data-group="comparison"] .module-group-illustration { background-image: url('Assets/3.png'); }
+        .module-group[data-group="removal"] .module-group-illustration { background-image: url('Assets/4.png'); }
+        .module-group[data-group="category"]::before { background-image: url('Assets/1.png'); }
+        .module-group[data-group="master"]::before { background-image: url('Assets/2.png'); }
+        .module-group[data-group="comparison"]::before { background-image: url('Assets/3.png'); }
+        .module-group[data-group="removal"]::before { background-image: url('Assets/4.png'); }
+
+        .module-group-heading h2 {
+            font-size: 1.3rem;
+            margin-bottom: 4px;
+        }
+
+        .module-group-heading p {
+            color: var(--muted);
+            font-size: 14px;
+            line-height: 1.7;
+        }
+
+        .module-group-count {
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(31, 106, 93, 0.1);
+            color: var(--accent-strong);
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .group-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 20px;
         }
 
         .section-head {
@@ -718,6 +936,23 @@
             margin-bottom: 12px;
         }
 
+        .action-lane {
+            margin-top: 14px;
+            padding: 14px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.68);
+            border: 1px solid rgba(76, 57, 34, 0.08);
+        }
+
+        .action-lane-title {
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 10px;
+        }
+
         .checklist-box {
             padding: 14px;
             border-radius: 14px;
@@ -750,20 +985,20 @@
 
         @media (max-width: 1080px) {
             .guide-grid,
-            .modules,
+            .group-grid,
             .field-grid {
                 grid-template-columns: 1fr;
+            }
+
+            .group-ribbon {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                position: static;
             }
 
             .hero-top,
             .section-head {
                 flex-direction: column;
                 align-items: flex-start;
-            }
-
-            .hero-side {
-                width: 100%;
-                grid-template-columns: repeat(2, minmax(0, 1fr));
             }
         }
 
@@ -780,7 +1015,7 @@
             }
 
             .hero-side {
-                grid-template-columns: 1fr;
+                display: none;
             }
 
             .actions {
@@ -794,6 +1029,21 @@
             .mini-stats {
                 grid-template-columns: 1fr;
             }
+
+            .group-ribbon {
+                grid-template-columns: 1fr;
+            }
+
+            .group-chip {
+                padding-left: 92px;
+                min-height: 96px;
+            }
+
+            .group-chip-thumb {
+                width: 84px;
+                height: 84px;
+                left: 8px;
+            }
         }
     </style>
 </head>
@@ -802,64 +1052,92 @@
         <section class="hero">
             <div class="hero-top">
                 <div>
-                    <div class="eyebrow">Browser-first workbook operations</div>
-                    <h1>Clean, filter, combine, and split spreadsheet data in one workspace.</h1>
-                    <p>
-                        A production-ready static tool for Excel workflows. Upload a file, preview the result,
-                        then export a polished workbook directly in the browser.
-                    </p>
-                    <div class="hero-meta">
-                        <div class="meta-pill">Static app for Vercel</div>
-                        <div class="meta-pill">No backend required</div>
-                        <div class="meta-pill">Multi-category filtering</div>
-                    </div>
-                </div>
-                <div class="hero-side">
-                    <div class="hero-side-card">
-                        <strong>What is included</strong>
-                        <span>4 workflow modules, export styling, category path generation, and guided in-app instructions.</span>
-                    </div>
-                    <div class="hero-side-card">
-                        <strong>Category update workflow</strong>
-                        <span>Select multiple category nodes at once, then prepend a new top-level category for matched rows.</span>
-                    </div>
+                    <div class="eyebrow">Bagel Toolkit</div>
+                    <h1>Bagel Super Excel Processor</h1>
+                    <p>cook your excel with magic</p>
                 </div>
             </div>
         </section>
 
-        <section class="guide">
-            <div class="section-head">
+        <section class="group-ribbon">
+            <a href="#group-category" class="group-chip" data-tone="category">
+                <div class="group-chip-thumb"></div>
+                <div class="group-chip-copy">
+                    <strong>Category</strong>
+                    <span>Hierarchy formatting and category filters</span>
+                </div>
+                <div class="group-chip-arrow">↓</div>
+            </a>
+            <a href="#group-master" class="group-chip" data-tone="master">
+                <div class="group-chip-thumb"></div>
+                <div class="group-chip-copy">
+                    <strong>Master List</strong>
+                    <span>Cleanup, hide, and retailer split exports</span>
+                </div>
+                <div class="group-chip-arrow">↓</div>
+            </a>
+            <a href="#group-comparison" class="group-chip" data-tone="comparison">
+                <div class="group-chip-thumb"></div>
+                <div class="group-chip-copy">
+                    <strong>Product Comparison</strong>
+                    <span>Change detection, lookup, and QA checks</span>
+                </div>
+                <div class="group-chip-arrow">↓</div>
+            </a>
+            <a href="#group-removal" class="group-chip" data-tone="removal">
+                <div class="group-chip-thumb"></div>
+                <div class="group-chip-copy">
+                    <strong>Removal Suggestion</strong>
+                    <span>Marked master workbook and removal-only output</span>
+                </div>
+                <div class="group-chip-arrow">↓</div>
+            </a>
+            <a href="#group-guide" class="group-chip" data-tone="guide" onclick="openGuideSection(event)">
+                <div class="group-chip-thumb"></div>
+                <div class="group-chip-copy">
+                    <strong>User Guide</strong>
+                    <span>Collapse or reopen the quick instructions</span>
+                </div>
+                <div class="group-chip-arrow">↓</div>
+            </a>
+        </section>
+
+        <details class="guide-accordion" id="group-guide">
+            <summary>
                 <div>
                     <h2>User Guide</h2>
-                    <p>Use the same file directly in the browser. Every module supports upload, preview, and export without exposing any customer-specific labels in the interface.</p>
+                    <div class="guide-summary-copy">Keep this section collapsed when you want more room for operations modules, then reopen it any time for process reminders.</div>
+                </div>
+                <div class="module-tag">Open Guide</div>
+            </summary>
+            <div class="guide-accordion-body">
+                <div class="guide-grid">
+                    <article class="guide-step">
+                        <span>1</span>
+                        <h3>Upload the source workbook</h3>
+                        <p>Each module reads the relevant sheet automatically. If a category or product sheet is available, the tool will prioritize it.</p>
+                    </article>
+                    <article class="guide-step">
+                        <span>2</span>
+                        <h3>Preview before export</h3>
+                        <p>Use the preview action to verify matched rows, combined category paths, and cleaned columns before downloading a new workbook.</p>
+                    </article>
+                    <article class="guide-step">
+                        <span>3</span>
+                        <h3>Filter multiple category nodes</h3>
+                        <p>In the category filter module, select one or many category values from the list. Rows are kept when any selected value appears in the category hierarchy.</p>
+                    </article>
+                    <article class="guide-step">
+                        <span>4</span>
+                        <h3>Apply hierarchy updates</h3>
+                        <p>Optionally add a new top-level category. The output includes a <strong>Combined Category</strong> column such as <strong>H *** A *** B *** C</strong>.</p>
+                    </article>
                 </div>
             </div>
-            <div class="guide-grid">
-                <article class="guide-step">
-                    <span>1</span>
-                    <h3>Upload the source workbook</h3>
-                    <p>Each module reads the relevant sheet automatically. If a category or product sheet is available, the tool will prioritize it.</p>
-                </article>
-                <article class="guide-step">
-                    <span>2</span>
-                    <h3>Preview before export</h3>
-                    <p>Use the preview action to verify matched rows, combined category paths, and cleaned columns before downloading a new workbook.</p>
-                </article>
-                <article class="guide-step">
-                    <span>3</span>
-                    <h3>Filter multiple category nodes</h3>
-                    <p>In the category filter module, select one or many category values from the list. Rows are kept when any selected value appears in the category hierarchy.</p>
-                </article>
-                <article class="guide-step">
-                    <span>4</span>
-                    <h3>Apply hierarchy updates</h3>
-                    <p>Optionally add a new top-level category. The output includes a <strong>Combined Category</strong> column such as <strong>H *** A *** B *** C</strong>.</p>
-                </article>
-            </div>
-        </section>
+        </details>
 
-        <section class="modules">
-            <article class="module-card" data-asset="1">
+        <section class="module-groups" id="moduleGroups">
+            <article class="module-card" data-asset="1" data-group="category">
                 <div class="module-inner">
                     <div class="module-top">
                         <div>
@@ -888,7 +1166,7 @@
                 </div>
             </article>
 
-            <article class="module-card" data-asset="2">
+            <article class="module-card" data-asset="2" data-group="category">
                 <div class="module-inner">
                     <div class="module-top">
                         <div>
@@ -963,7 +1241,7 @@
                 </div>
             </article>
 
-            <article class="module-card" data-asset="3">
+            <article class="module-card" data-asset="3" data-group="master">
                 <div class="module-inner">
                     <div class="module-top">
                         <div>
@@ -1013,7 +1291,7 @@
                 </div>
             </article>
 
-            <article class="module-card" data-asset="4">
+            <article class="module-card" data-asset="4" data-group="master">
                 <div class="module-inner">
                     <div class="module-top">
                         <div>
@@ -1041,7 +1319,42 @@
                 </div>
             </article>
 
-            <article class="module-card" data-asset="1">
+            <article class="module-card" data-asset="4" data-group="removal">
+                <div class="module-inner">
+                    <div class="module-top">
+                        <div>
+                            <div class="module-tag">Module 04B</div>
+                            <h2 class="module-title">Master List and Removal Suggestion</h2>
+                        </div>
+                    </div>
+                    <p class="module-copy">Clean the raw master list, process the removal suggestion workbook, keep only retailer columns containing removal actions, and export a marked master file plus a removal-only sheet.</p>
+                    <div class="feature-list">
+                        <div class="feature-badge">Master cleanup included</div>
+                        <div class="feature-badge">Removal suggestion processing</div>
+                        <div class="feature-badge">RPC and URL removal marking</div>
+                    </div>
+                    <div class="panel">
+                        <div class="field-grid">
+                            <div class="field">
+                                <label for="removalMasterFile">Master workbook</label>
+                                <input type="file" id="removalMasterFile" accept=".xlsx,.xls">
+                            </div>
+                            <div class="field">
+                                <label for="removalSuggestionFile">Removal suggestion workbook</label>
+                                <input type="file" id="removalSuggestionFile" accept=".xlsx,.xls">
+                            </div>
+                        </div>
+                        <div class="actions">
+                            <button class="btn btn-primary" onclick="processMasterRemovalSuggestion()">Build Marked Workbook</button>
+                            <button class="btn" onclick="previewMasterRemovalSuggestion()">Preview</button>
+                        </div>
+                        <div id="statusRemovalSuggestion" class="status"></div>
+                        <div id="previewRemovalSuggestion" class="preview"></div>
+                    </div>
+                </div>
+            </article>
+
+            <article class="module-card" data-asset="1" data-group="comparison">
                 <div class="module-inner">
                     <div class="module-top">
                         <div>
@@ -1085,21 +1398,32 @@
                                 <span>comparison groups</span>
                             </div>
                         </div>
-                        <div class="config-actions">
-                            <button class="btn btn-subtle" type="button" onclick="initializeComparisonState()">Load Headers</button>
-                            <button class="btn btn-subtle" type="button" onclick="addComparisonGroup()">Add Comparison Group</button>
-                            <button class="btn btn-subtle" type="button" onclick="addSuggestedComparisonGroups()">Add Suggested Retailers</button>
+                        <div class="action-lane">
+                            <div class="action-lane-title">Setup</div>
+                            <div class="config-actions">
+                                <button class="btn btn-subtle" type="button" onclick="initializeComparisonState()">Load Headers</button>
+                                <button class="btn btn-subtle" type="button" onclick="addComparisonGroup()">Add Comparison Group</button>
+                                <button class="btn btn-subtle" type="button" onclick="addSuggestedComparisonGroups()">Add Suggested Retailers</button>
+                            </div>
                         </div>
                         <div class="subsection">
                             <div class="subsection-title">Change Detection</div>
                             <div class="subsection-copy">Configure retailer groups to find additions and removals, then prepare operations outputs and internal notes.</div>
                             <div id="comparisonConfigList" class="config-list"></div>
-                            <div class="actions">
-                                <button class="btn btn-primary" onclick="processClientComparison()">Export Add / Remove</button>
-                                <button class="btn" onclick="previewClientComparison()">Preview</button>
-                                <button class="btn" onclick="exportGoogleSheetReady()">Google Sheet Ready</button>
-                                <button class="btn" onclick="generateJiraDraft()">Jira Draft</button>
-                                <button class="btn" onclick="showReviewCases()">Review Cases</button>
+                            <div class="action-lane">
+                                <div class="action-lane-title">Exports</div>
+                                <div class="actions">
+                                    <button class="btn btn-primary" onclick="processClientComparison()">Export Add / Remove</button>
+                                    <button class="btn" onclick="previewClientComparison()">Preview</button>
+                                    <button class="btn" onclick="exportGoogleSheetReady()">Google Sheet Ready</button>
+                                </div>
+                            </div>
+                            <div class="action-lane">
+                                <div class="action-lane-title">Operations Notes</div>
+                                <div class="actions">
+                                    <button class="btn" onclick="generateJiraDraft()">Jira Draft</button>
+                                    <button class="btn" onclick="showReviewCases()">Review Cases</button>
+                                </div>
                             </div>
                         </div>
                         <div class="subsection">
@@ -1134,7 +1458,7 @@
                 </div>
             </article>
 
-            <article class="module-card" data-asset="2">
+            <article class="module-card" data-asset="2" data-group="comparison">
                 <div class="module-inner">
                     <div class="module-top">
                         <div>
@@ -1238,7 +1562,7 @@
         </section>
 
         <footer>
-            Workbook Operations Hub | Static-ready for Vercel deployment
+            Workbook Operations Hub | Grouped browser workflows for commercial-ready Vercel deployment
         </footer>
     </main>
 
@@ -1298,6 +1622,7 @@
         document.getElementById('categorySelectorTrigger').addEventListener('click', toggleCategorySelector);
         document.getElementById('categorySearch').addEventListener('input', renderCategoryOptions);
         document.addEventListener('click', handleOutsideClick);
+        document.addEventListener('DOMContentLoaded', initializeGroupedLayout);
 
         function showStatus(element, message, type) {
             element.innerHTML = message;
@@ -1317,6 +1642,75 @@
         function hidePreview(element) {
             element.innerHTML = '';
             element.classList.remove('show');
+        }
+
+        function initializeGroupedLayout() {
+            const container = document.getElementById('moduleGroups');
+            if (!container) return;
+            const cards = Array.from(container.querySelectorAll(':scope > .module-card'));
+            if (!cards.length) return;
+
+            const groups = [
+                {
+                    key: 'category',
+                    title: 'Category Operations',
+                    copy: 'Category formatting, category filtering, and hierarchy update workflows.',
+                },
+                {
+                    key: 'master',
+                    title: 'Master List Operations',
+                    copy: 'Cleanup, export splitting, and raw master preparation workflows.',
+                },
+                {
+                    key: 'comparison',
+                    title: 'Product Comparison',
+                    copy: 'Client comparison, lookup enrichment, and post-update QA verification.',
+                },
+                {
+                    key: 'removal',
+                    title: 'Removal Suggestion',
+                    copy: 'Generate a marked clean master list and a focused removal sheet for internal handling.',
+                }
+            ];
+
+            container.innerHTML = '';
+            groups.forEach((group) => {
+                const section = document.createElement('section');
+                section.className = 'module-group';
+                section.dataset.group = group.key;
+                section.id = `group-${group.key}`;
+                section.innerHTML = `
+                    <div class="module-group-header">
+                        <div class="module-group-heading">
+                            <div class="module-group-illustration"></div>
+                            <div>
+                                <h2>${group.title}</h2>
+                                <p>${group.copy}</p>
+                            </div>
+                        </div>
+                        <div class="module-group-count"></div>
+                    </div>
+                    <div class="group-grid"></div>
+                `;
+                const grid = section.querySelector('.group-grid');
+                cards
+                    .filter((card) => card.dataset.group === group.key)
+                    .forEach((card) => grid.appendChild(card));
+                if (grid.children.length) {
+                    section.querySelector('.module-group-count').textContent = `${grid.children.length} module${grid.children.length > 1 ? 's' : ''}`;
+                    container.appendChild(section);
+                }
+            });
+        }
+
+        function openGuideSection(event) {
+            const guide = document.getElementById('group-guide');
+            if (!guide) return;
+            guide.open = true;
+            if (event) event.preventDefault();
+            requestAnimationFrame(() => {
+                guide.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
         }
 
         function cleanColumnName(colName) {
@@ -1988,6 +2382,248 @@
                     }
                 }
             });
+        }
+
+        function processRemovalSuggestionMatrix(matrix) {
+            if (!matrix.length) throw new Error('The removal suggestion sheet is empty');
+            const headers = makeUniqueHeaders(matrix[0]);
+            const baseRows = matrix.slice(1).map((row) => {
+                const rowObject = {};
+                headers.forEach((header, index) => {
+                    rowObject[header] = index < row.length ? row[index] : '';
+                });
+                return rowObject;
+            }).filter((row) => Object.values(row).some((value) => !isEmptyCell(value)));
+
+            const otherColumns = headers.filter((header) => /\bother\b/i.test(String(header)));
+            if (!otherColumns.length) {
+                return {
+                    headers,
+                    rows: baseRows,
+                    transformed: false,
+                    detectedOtherColumns: [],
+                    retainedRetailerColumns: headers.slice(4)
+                };
+            }
+
+            let rows = baseRows.map((row) => {
+                const nextRow = { ...row };
+                otherColumns.forEach((column) => {
+                    const rawValue = row[column];
+                    const cleaned = rawValue === null || rawValue === undefined
+                        ? ''
+                        : String(rawValue).trim().toLowerCase().replace(/[%, ]/g, '');
+                    nextRow[column] = /^0(\.0{1,3})?$/.test(cleaned) ? 'Remove' : '';
+                });
+                return nextRow;
+            });
+
+            let processedHeaders = [...headers];
+            let processedRows = rows.map((row) => ({ ...row }));
+            for (let removeCount = 0; removeCount < 2; removeCount += 1) {
+                if (processedHeaders.length >= 5) {
+                    const headerToDrop = processedHeaders[4];
+                    processedHeaders.splice(4, 1);
+                    processedRows = processedRows.map((row) => {
+                        const nextRow = { ...row };
+                        delete nextRow[headerToDrop];
+                        return nextRow;
+                    });
+                }
+            }
+
+            const retailerColumnsStartIndex = 4;
+            const retailerColumns = processedHeaders.slice(retailerColumnsStartIndex);
+            const removableRetailerColumns = retailerColumns.filter((header) =>
+                processedRows.some((row) => String(row[header] ?? '') === 'Remove')
+            );
+            const keepHeaderSet = new Set([
+                ...processedHeaders.slice(0, retailerColumnsStartIndex),
+                ...removableRetailerColumns
+            ]);
+            processedHeaders = processedHeaders.filter((header) => keepHeaderSet.has(header));
+            processedRows = processedRows.map((row) => {
+                const nextRow = {};
+                processedHeaders.forEach((header) => {
+                    nextRow[header] = row[header] ?? '';
+                });
+                return nextRow;
+            });
+
+            return {
+                headers: processedHeaders,
+                rows: processedRows,
+                transformed: true,
+                detectedOtherColumns: otherColumns,
+                retainedRetailerColumns: removableRetailerColumns
+            };
+        }
+
+        function applyRemovalMarkingStyles(worksheet, matrix, headers, removalProducts) {
+            const rpcIndices = [];
+            const urlIndices = [];
+            headers.forEach((header, index) => {
+                const normalizedHeader = String(header).trim().toLowerCase();
+                if (/^\s*rpc\s/i.test(normalizedHeader)) rpcIndices.push(index);
+                if (/^\s*url\s/i.test(normalizedHeader)) urlIndices.push(index);
+            });
+
+            matrix.slice(1).forEach((row, rowIndex) => {
+                const productName = normalizeIdentifier(row[0] ?? '');
+                if (!removalProducts.has(productName)) return;
+                [...rpcIndices, ...urlIndices].forEach((columnIndex) => {
+                    const cellAddress = XLSX.utils.encode_cell({ r: rowIndex + 1, c: columnIndex });
+                    if (!worksheet[cellAddress]) {
+                        worksheet[cellAddress] = { t: 's', v: row[columnIndex] ?? '' };
+                    }
+                    worksheet[cellAddress].s = worksheet[cellAddress].s || {};
+                    worksheet[cellAddress].s.fill = { fgColor: { rgb: 'FFEEEE' } };
+                    worksheet[cellAddress].s.font = { bold: true, color: { rgb: 'FF0000' } };
+                });
+            });
+
+            if (worksheet['!ref']) {
+                const range = XLSX.utils.decode_range(worksheet['!ref']);
+                worksheet['!autofilter'] = { ref: XLSX.utils.encode_range(range) };
+            }
+        }
+
+        function buildMasterRemovalSuggestionResult(masterWorkbook, suggestionWorkbook) {
+            const masterSheetName = findBestSheetName(masterWorkbook, ['product list', 'master', 'products']);
+            const masterWorksheet = masterWorkbook.Sheets[masterSheetName];
+            const masterProcessed = processWorksheetData(masterWorksheet, COLUMNS_TO_DROP);
+            const cleanedMasterRows = filterRowsWithContent(masterProcessed.data, masterProcessed.headers);
+            if (!cleanedMasterRows.length) {
+                throw new Error('No actionable rows remained in the master workbook after cleanup');
+            }
+
+            const suggestionSheetName = suggestionWorkbook.SheetNames[0];
+            if (!suggestionSheetName) {
+                throw new Error('The removal suggestion workbook does not contain any sheets');
+            }
+            const suggestionWorksheet = suggestionWorkbook.Sheets[suggestionSheetName];
+            const suggestionMatrix = getWorksheetMatrix(suggestionWorksheet);
+            const processedSuggestion = processRemovalSuggestionMatrix(suggestionMatrix);
+            const suggestionProductHeader = processedSuggestion.headers[0];
+            if (!suggestionProductHeader) {
+                throw new Error('The removal suggestion file does not include a product column');
+            }
+
+            const removalProductKeySet = new Set(
+                processedSuggestion.rows
+                    .map((row) => normalizeIdentifier(row[suggestionProductHeader]))
+                    .filter(Boolean)
+            );
+
+            const masterNameHeader = masterProcessed.headers[0];
+            if (!masterNameHeader) {
+                throw new Error('The cleaned master workbook does not include a product name column');
+            }
+
+            const removalOnlyRows = cleanedMasterRows.filter((row) => removalProductKeySet.has(normalizeIdentifier(row[masterNameHeader])));
+            const matchedProductKeys = new Set(removalOnlyRows.map((row) => normalizeIdentifier(row[masterNameHeader])));
+            const unmatchedRemovalProducts = processedSuggestion.rows
+                .map((row) => String(row[suggestionProductHeader] ?? '').trim())
+                .filter((value) => value && !matchedProductKeys.has(normalizeIdentifier(value)));
+
+            const cleanMasterMatrix = [
+                masterProcessed.headers,
+                ...cleanedMasterRows.map((row) => masterProcessed.headers.map((header) => row[header] !== undefined ? row[header] : ''))
+            ];
+            const removalOnlyMatrix = [
+                masterProcessed.headers,
+                ...removalOnlyRows.map((row) => masterProcessed.headers.map((header) => row[header] !== undefined ? row[header] : ''))
+            ];
+
+            return {
+                masterSheetName,
+                suggestionSheetName,
+                cleanMasterHeaders: masterProcessed.headers,
+                cleanedMasterRows,
+                processedSuggestion,
+                removalProductKeySet,
+                removalOnlyRows,
+                unmatchedRemovalProducts,
+                cleanMasterMatrix,
+                removalOnlyMatrix
+            };
+        }
+
+        async function processMasterRemovalSuggestion() {
+            const status = document.getElementById('statusRemovalSuggestion');
+            const preview = document.getElementById('previewRemovalSuggestion');
+            hidePreview(preview);
+
+            try {
+                showStatus(status, 'Cleaning the master workbook and processing the removal suggestion list...', 'loading');
+                const [masterWorkbook, suggestionWorkbook] = await Promise.all([
+                    readWorkbookFromInput(document.getElementById('removalMasterFile')),
+                    readWorkbookFromInput(document.getElementById('removalSuggestionFile'))
+                ]);
+
+                const result = buildMasterRemovalSuggestionResult(masterWorkbook, suggestionWorkbook);
+                const workbookOut = XLSX.utils.book_new();
+                const cleanMasterSheet = XLSX.utils.aoa_to_sheet(result.cleanMasterMatrix);
+                const removalOnlySheet = XLSX.utils.aoa_to_sheet(result.removalOnlyMatrix);
+                applySheetStyles(cleanMasterSheet, result.cleanMasterMatrix);
+                applySheetStyles(removalOnlySheet, result.removalOnlyMatrix);
+                applyRemovalMarkingStyles(cleanMasterSheet, result.cleanMasterMatrix, result.cleanMasterHeaders, result.removalProductKeySet);
+                applyRemovalMarkingStyles(removalOnlySheet, result.removalOnlyMatrix, result.cleanMasterHeaders, result.removalProductKeySet);
+                XLSX.utils.book_append_sheet(workbookOut, cleanMasterSheet, 'Clean Master List');
+                XLSX.utils.book_append_sheet(workbookOut, removalOnlySheet, 'Removal Products');
+                XLSX.writeFile(workbookOut, 'master_list_removal_suggestion.xlsx');
+
+                showStatus(
+                    status,
+                    `Export complete. ${result.cleanedMasterRows.length} cleaned master rows and ${result.removalOnlyRows.length} matched removal rows were written.${result.unmatchedRemovalProducts.length ? ` ${result.unmatchedRemovalProducts.length} suggestion product(s) were not found in master.` : ''}`,
+                    'success'
+                );
+            } catch (error) {
+                showStatus(status, `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function previewMasterRemovalSuggestion() {
+            const preview = document.getElementById('previewRemovalSuggestion');
+
+            try {
+                const [masterWorkbook, suggestionWorkbook] = await Promise.all([
+                    readWorkbookFromInput(document.getElementById('removalMasterFile')),
+                    readWorkbookFromInput(document.getElementById('removalSuggestionFile'))
+                ]);
+                const result = buildMasterRemovalSuggestionResult(masterWorkbook, suggestionWorkbook);
+                const retainedRetailers = result.processedSuggestion.retainedRetailerColumns.length
+                    ? result.processedSuggestion.retainedRetailerColumns.join(', ')
+                    : 'None';
+                const unmatchedRows = result.unmatchedRemovalProducts.slice(0, 5).map((name, index) => `
+                    <div class="preview-row">
+                        <strong>Unmatched ${index + 1}</strong><br>
+                        ${escapeHtml(name)}
+                    </div>
+                `).join('');
+                const matchedRows = result.removalOnlyRows.slice(0, 4).map((row, index) => `
+                    <div class="preview-row">
+                        <strong>Removal Match ${index + 1}</strong><br>
+                        ${escapeHtml(result.cleanMasterHeaders.slice(0, 4).map((header) => `${header}: ${row[header] ?? ''}`).join(' | '))}
+                    </div>
+                `).join('');
+
+                showPreview(
+                    preview,
+                    `<div class="preview-title">Removal suggestion preview</div>
+                     <div class="preview-row">
+                        <strong>Master rows after cleanup:</strong> ${result.cleanedMasterRows.length}<br>
+                        <strong>Suggestion rows:</strong> ${result.processedSuggestion.rows.length}<br>
+                        <strong>Matched removal rows:</strong> ${result.removalOnlyRows.length}<br>
+                        <strong>Processed "other" columns:</strong> ${result.processedSuggestion.detectedOtherColumns.length ? escapeHtml(result.processedSuggestion.detectedOtherColumns.join(', ')) : 'None'}<br>
+                        <strong>Retailer columns kept:</strong> ${escapeHtml(retainedRetailers)}
+                     </div>
+                     ${matchedRows || '<div class="preview-row">No removal products matched the cleaned master list.</div>'}
+                     ${unmatchedRows ? `<div class="preview-title" style="margin-top: 14px;">Not found in master</div>${unmatchedRows}` : ''}`
+                );
+            } catch (error) {
+                showPreview(preview, `<div class="preview-title">Preview error</div><div class="preview-row">${escapeHtml(error.message)}</div>`);
+            }
         }
 
         function collectDuplicateIdentifiers(rows, columnName, retailerName, sourceLabel) {
