@@ -1400,6 +1400,20 @@
                         </div>
                         <div class="action-lane">
                             <div class="action-lane-title">Setup</div>
+                            <div class="field-grid" style="margin-bottom: 12px;">
+                                <div class="field-full">
+                                    <div class="toggle-row">
+                                        <span>Include <strong>Competitor</strong> rows from master during comparison</span>
+                                        <input type="checkbox" id="comparisonIncludeCompetitor" onchange="updateComparisonOption('includeCompetitor', this.checked)">
+                                    </div>
+                                </div>
+                                <div class="field-full">
+                                    <div class="toggle-row">
+                                        <span>Run <strong>Additions Only</strong> check and skip removal output</span>
+                                        <input type="checkbox" id="comparisonAdditionsOnly" onchange="updateComparisonOption('additionsOnly', this.checked)">
+                                    </div>
+                                </div>
+                            </div>
                             <div class="config-actions">
                                 <button class="btn btn-subtle" type="button" onclick="initializeComparisonState()">Load Headers</button>
                                 <button class="btn btn-subtle" type="button" onclick="addComparisonGroup()">Add Comparison Group</button>
@@ -1581,6 +1595,7 @@
             masterWorkbook: null,
             clientWorkbook: null,
             masterHeaders: [],
+            allMasterRows: [],
             masterRows: [],
             clientHeaders: [],
             clientSheets: {},
@@ -1588,6 +1603,10 @@
             clientRows: [],
             retailerOptions: [],
             groups: [],
+            options: {
+                includeCompetitor: false,
+                additionsOnly: false
+            },
             lookupConfig: {
                 clientSheet: '',
                 clientColumn: '',
@@ -1929,6 +1948,29 @@
             document.getElementById('comparisonGroupCount').textContent = String(comparisonState.groups.length);
         }
 
+        function getComparisonScopeLabel() {
+            return comparisonState.options.includeCompetitor ? 'Client + Competitor' : 'Owner = Client';
+        }
+
+        function getComparisonMasterRows() {
+            return filterMasterRowsForComparison(
+                comparisonState.allMasterRows,
+                comparisonState.masterHeaders,
+                comparisonState.options.includeCompetitor
+            );
+        }
+
+        function refreshComparisonMasterScope() {
+            comparisonState.masterRows = getComparisonMasterRows();
+            renderComparisonGroups();
+            updateComparisonStats();
+        }
+
+        function updateComparisonOption(field, value) {
+            comparisonState.options[field] = value;
+            refreshComparisonMasterScope();
+        }
+
         function updateLookupConfig(field, value) {
             comparisonState.lookupConfig[field] = value;
             renderLookupControls();
@@ -2177,7 +2219,6 @@
 
                 const masterProcessed = processWorksheetData(masterWorksheet, COLUMNS_TO_DROP);
                 const cleanedMasterRows = filterRowsWithContent(masterProcessed.data, masterProcessed.headers);
-                const masterRows = filterMasterRowsForComparison(cleanedMasterRows, masterProcessed.headers);
                 const clientSheets = {};
                 const unionClientHeaders = new Set();
                 const allClientRows = [];
@@ -2212,10 +2253,15 @@
                 comparisonState.masterWorkbook = masterWorkbook;
                 comparisonState.clientWorkbook = clientWorkbook;
                 comparisonState.masterHeaders = masterProcessed.headers;
+                comparisonState.allMasterRows = cleanedMasterRows;
                 comparisonState.clientHeaders = Array.from(unionClientHeaders);
                 comparisonState.clientSheets = clientSheets;
                 comparisonState.clientSheetNames = clientSheetNames;
-                comparisonState.masterRows = masterRows;
+                comparisonState.masterRows = filterMasterRowsForComparison(
+                    cleanedMasterRows,
+                    masterProcessed.headers,
+                    comparisonState.options.includeCompetitor
+                );
                 comparisonState.clientRows = allClientRows;
                 comparisonState.retailerOptions = Object.keys(getRetailerMapFromHeaders(masterProcessed.headers)).sort((a, b) => a.localeCompare(b));
                 comparisonState.lastResult = null;
@@ -2239,7 +2285,11 @@
 
                 renderComparisonGroups();
                 renderLookupControls();
-                showStatus(status, `Headers loaded. Comparable master rows: ${masterRows.length} (Owner = Client). Client rows: ${allClientRows.length} across ${clientSheetNames.length} sheet(s). Configure the comparison groups and run export.`, 'success');
+                showStatus(
+                    status,
+                    `Headers loaded. Comparable master rows: ${comparisonState.masterRows.length} (${getComparisonScopeLabel()}). Client rows: ${allClientRows.length} across ${clientSheetNames.length} sheet(s). Configure the comparison groups and run export.`,
+                    'success'
+                );
             } catch (error) {
                 showStatus(status, `Error: ${error.message}`, 'error');
             }
@@ -2254,7 +2304,8 @@
             return headers.find((header) => String(header).trim().toLowerCase() === 'owner') || '';
         }
 
-        function filterMasterRowsForComparison(rows, headers) {
+        function filterMasterRowsForComparison(rows, headers, includeCompetitor = false) {
+            if (includeCompetitor) return rows;
             const ownerColumn = getOwnerColumnName(headers);
             if (!ownerColumn) return rows;
             return rows.filter((row) => normalizeIdentifier(row[ownerColumn]) === 'client');
@@ -2647,6 +2698,8 @@
             const rows = [
                 ['Metric', 'Value'],
                 ['Comparison groups', result.validGroups.length],
+                ['Comparison scope', result.comparisonScope],
+                ['Additions only mode', result.additionsOnly ? 'Yes' : 'No'],
                 ['Addition rows', result.additions.length],
                 ['Removal rows', result.removals.length],
                 ['Review cases', result.reviewCases.length],
@@ -2682,6 +2735,8 @@
                 '',
                 'Summary:',
                 `- Comparison groups: ${result.validGroups.length}`,
+                `- Comparison scope: ${result.comparisonScope}`,
+                `- Additions only mode: ${result.additionsOnly ? 'Yes' : 'No'}`,
                 `- Addition rows: ${result.additions.length}`,
                 `- Removal rows: ${result.removals.length}`,
                 `- Review cases: ${result.reviewCases.length}`,
@@ -2691,7 +2746,10 @@
                 '',
                 'Source files:',
                 '- Master workbook cleaned automatically before comparison',
-                '- Comparison limited to Owner = Client rows when Owner column exists',
+                result.additionsOnly ? '- Removal check skipped by additions only mode' : '- Additions and removals checked together',
+                result.comparisonScope === 'Client + Competitor'
+                    ? '- Comparison includes Client and Competitor rows from master'
+                    : '- Comparison limited to Owner = Client rows when Owner column exists',
                 '- Lazada identifiers normalized using the short code before "_"',
                 '',
                 'Review notes:',
@@ -2719,6 +2777,8 @@
             const removalEntries = new Map();
             const groupSummaries = [];
             const reviewCases = [];
+            const additionsOnly = comparisonState.options.additionsOnly;
+            const comparisonScope = getComparisonScopeLabel();
 
             validGroups.forEach((group, index) => {
                 const retailerName = group.retailerName.trim() || `Group ${index + 1}`;
@@ -2775,19 +2835,21 @@
                     additionEntries.set(clientRowKey, entry);
                 });
 
-                masterMap.forEach((row, identifier) => {
-                    if (clientMap.has(identifier)) return;
-                    removalCount += 1;
-                    const masterRowKey = getMasterRowKey(row);
-                    const statusHeader = `Status - ${retailerName}`;
-                    const entry = removalEntries.get(masterRowKey) || {
-                        baseRow: row,
-                        clientSheet: group.clientSheet,
-                        statuses: {}
-                    };
-                    entry.statuses[statusHeader] = 'Remove';
-                    removalEntries.set(masterRowKey, entry);
-                });
+                if (!additionsOnly) {
+                    masterMap.forEach((row, identifier) => {
+                        if (clientMap.has(identifier)) return;
+                        removalCount += 1;
+                        const masterRowKey = getMasterRowKey(row);
+                        const statusHeader = `Status - ${retailerName}`;
+                        const entry = removalEntries.get(masterRowKey) || {
+                            baseRow: row,
+                            clientSheet: group.clientSheet,
+                            statuses: {}
+                        };
+                        entry.statuses[statusHeader] = 'Remove';
+                        removalEntries.set(masterRowKey, entry);
+                    });
+                }
 
                 groupSummaries.push({
                     retailerName,
@@ -2854,6 +2916,8 @@
                 validGroups,
                 groupSummaries,
                 reviewCases,
+                additionsOnly,
+                comparisonScope,
                 additionHeaders,
                 removalHeaders,
                 additionStatusHeaders,
@@ -2867,25 +2931,32 @@
             const status = document.getElementById('statusComparison');
 
             try {
-                showStatus(status, 'Comparing files and building additions/removals sheets...', 'loading');
+                showStatus(status, comparisonState.options.additionsOnly ? 'Comparing files and building additions-only output...' : 'Comparing files and building additions/removals sheets...', 'loading');
                 const result = buildClientComparisonResult();
                 comparisonState.lastResult = result;
 
                 const workbookOut = XLSX.utils.book_new();
                 const additionsMatrix = [result.additionHeaders, ...result.additions.map((row) => result.additionHeaders.map((header) => row[header] !== undefined ? row[header] : ''))];
-                const removalsMatrix = [result.removalHeaders, ...result.removals.map((row) => result.removalHeaders.map((header) => row[header] !== undefined ? row[header] : ''))];
-
                 const additionsSheet = XLSX.utils.aoa_to_sheet(additionsMatrix);
-                const removalsSheet = XLSX.utils.aoa_to_sheet(removalsMatrix);
                 applySheetStyles(additionsSheet, additionsMatrix);
-                applySheetStyles(removalsSheet, removalsMatrix);
                 applyStatusCellColors(additionsSheet, additionsMatrix, result.additionStatusHeaders);
-                applyStatusCellColors(removalsSheet, removalsMatrix, result.removalStatusHeaders);
                 XLSX.utils.book_append_sheet(workbookOut, additionsSheet, 'Additions');
-                XLSX.utils.book_append_sheet(workbookOut, removalsSheet, 'Removals');
-                XLSX.writeFile(workbookOut, 'client_file_comparison.xlsx');
+                if (!result.additionsOnly) {
+                    const removalsMatrix = [result.removalHeaders, ...result.removals.map((row) => result.removalHeaders.map((header) => row[header] !== undefined ? row[header] : ''))];
+                    const removalsSheet = XLSX.utils.aoa_to_sheet(removalsMatrix);
+                    applySheetStyles(removalsSheet, removalsMatrix);
+                    applyStatusCellColors(removalsSheet, removalsMatrix, result.removalStatusHeaders);
+                    XLSX.utils.book_append_sheet(workbookOut, removalsSheet, 'Removals');
+                }
+                XLSX.writeFile(workbookOut, result.additionsOnly ? 'client_file_additions_only.xlsx' : 'client_file_comparison.xlsx');
 
-                showStatus(status, `Export complete. ${result.additions.length} additions and ${result.removals.length} removals were written across ${result.validGroups.length} comparison groups.`, 'success');
+                showStatus(
+                    status,
+                    result.additionsOnly
+                        ? `Export complete. ${result.additions.length} additions were written across ${result.validGroups.length} comparison groups. Removal check was skipped.`
+                        : `Export complete. ${result.additions.length} additions and ${result.removals.length} removals were written across ${result.validGroups.length} comparison groups.`,
+                    'success'
+                );
             } catch (error) {
                 showStatus(status, `Error: ${error.message}`, 'error');
             }
@@ -2902,28 +2973,30 @@
                 const workbookOut = XLSX.utils.book_new();
                 const summaryMatrix = buildSummaryRows(result);
                 const additionsMatrix = [result.additionHeaders, ...result.additions.map((row) => result.additionHeaders.map((header) => row[header] !== undefined ? row[header] : ''))];
-                const removalsMatrix = [result.removalHeaders, ...result.removals.map((row) => result.removalHeaders.map((header) => row[header] !== undefined ? row[header] : ''))];
                 const reviewMatrix = buildReviewCaseRows(result.reviewCases);
 
                 const summarySheet = XLSX.utils.aoa_to_sheet(summaryMatrix);
                 const additionsSheet = XLSX.utils.aoa_to_sheet(additionsMatrix);
-                const removalsSheet = XLSX.utils.aoa_to_sheet(removalsMatrix);
                 const reviewSheet = XLSX.utils.aoa_to_sheet(reviewMatrix);
 
                 applySheetStyles(summarySheet, summaryMatrix);
                 applySheetStyles(additionsSheet, additionsMatrix);
-                applySheetStyles(removalsSheet, removalsMatrix);
                 applySheetStyles(reviewSheet, reviewMatrix);
                 applyStatusCellColors(additionsSheet, additionsMatrix, result.additionStatusHeaders);
-                applyStatusCellColors(removalsSheet, removalsMatrix, result.removalStatusHeaders);
 
                 XLSX.utils.book_append_sheet(workbookOut, summarySheet, 'Summary');
                 XLSX.utils.book_append_sheet(workbookOut, additionsSheet, 'Additions');
-                XLSX.utils.book_append_sheet(workbookOut, removalsSheet, 'Removals');
+                if (!result.additionsOnly) {
+                    const removalsMatrix = [result.removalHeaders, ...result.removals.map((row) => result.removalHeaders.map((header) => row[header] !== undefined ? row[header] : ''))];
+                    const removalsSheet = XLSX.utils.aoa_to_sheet(removalsMatrix);
+                    applySheetStyles(removalsSheet, removalsMatrix);
+                    applyStatusCellColors(removalsSheet, removalsMatrix, result.removalStatusHeaders);
+                    XLSX.utils.book_append_sheet(workbookOut, removalsSheet, 'Removals');
+                }
                 XLSX.utils.book_append_sheet(workbookOut, reviewSheet, 'Review Cases');
                 XLSX.writeFile(workbookOut, 'google_sheet_ready_comparison.xlsx');
 
-                showStatus(status, `Google Sheet ready export complete. Summary, additions, removals, and review cases were written.`, 'success');
+                showStatus(status, result.additionsOnly ? 'Google Sheet ready export complete. Summary, additions, and review cases were written.' : 'Google Sheet ready export complete. Summary, additions, removals, and review cases were written.', 'success');
             } catch (error) {
                 showStatus(status, `Error: ${error.message}`, 'error');
             }
@@ -3000,10 +3073,10 @@
                 showPreview(
                     preview,
                     `<div class="preview-title">Comparison preview</div>
-                     <div class="preview-row">Groups: ${result.validGroups.length} | Additions: ${result.additions.length} | Removals: ${result.removals.length}</div>
+                     <div class="preview-row">Scope: ${escapeHtml(result.comparisonScope)} | Groups: ${result.validGroups.length} | Additions: ${result.additions.length} | Removals: ${result.removals.length}${result.additionsOnly ? ' | Additions only mode' : ''}</div>
                      ${groupPreview}
                      ${additionPreview || '<div class="preview-row">No additions found.</div>'}
-                     ${removalPreview || '<div class="preview-row">No removals found.</div>'}`
+                     ${result.additionsOnly ? '<div class="preview-row">Removal check is skipped in additions only mode.</div>' : (removalPreview || '<div class="preview-row">No removals found.</div>')}`
                 );
             } catch (error) {
                 showPreview(preview, `<div class="preview-title">Preview error</div><div class="preview-row">${escapeHtml(error.message)}</div>`);
