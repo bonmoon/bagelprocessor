@@ -1429,6 +1429,7 @@
                                 <div class="action-lane-title">Exports</div>
                                 <div class="actions">
                                     <button class="btn btn-primary" onclick="processClientComparison()">Export Add / Remove</button>
+                                    <button class="btn" onclick="exportClientCoverageCheck()">Client Coverage Check</button>
                                     <button class="btn" onclick="previewClientComparison()">Preview</button>
                                     <button class="btn" onclick="exportGoogleSheetReady()">Google Sheet Ready</button>
                                 </div>
@@ -2510,8 +2511,10 @@
                         worksheet[cellAddress].s.fill = { fgColor: { rgb: 'CDEFD8' } };
                     } else if (value === 'remove') {
                         worksheet[cellAddress].s.fill = { fgColor: { rgb: 'F6D1CF' } };
-                    } else if (value === 'tracked') {
+                    } else if (value === 'tracked' || value === 'existing') {
                         worksheet[cellAddress].s.fill = { fgColor: { rgb: 'E8EDF7' } };
+                    } else if (value === 'not tracked') {
+                        worksheet[cellAddress].s.fill = { fgColor: { rgb: 'F9E6C8' } };
                     }
                 }
             });
@@ -3009,6 +3012,97 @@
             };
         }
 
+        function buildClientCoverageResult() {
+            if (!comparisonState.masterRows.length || !comparisonState.clientRows.length) {
+                throw new Error('Please load both master and client files first');
+            }
+            const validGroups = comparisonState.groups.filter((group) => group.masterColumn && group.clientSheet && group.clientColumn);
+            if (!validGroups.length) {
+                throw new Error('Please configure at least one comparison group with a master column, client sheet, and client identifier column');
+            }
+
+            const retailerNames = getUniqueRetailerNames(validGroups);
+            const statusHeaders = buildStatusHeaders(retailerNames);
+            const coverageEntries = new Map();
+            const groupSummaries = [];
+            const comparisonScope = getComparisonScopeLabel();
+
+            validGroups.forEach((group, index) => {
+                const retailerName = group.retailerName.trim() || `Group ${index + 1}`;
+                const clientSheetConfig = comparisonState.clientSheets[group.clientSheet];
+                if (!clientSheetConfig) return;
+
+                const masterMap = new Map();
+                comparisonState.masterRows.forEach((row) => {
+                    const identifier = normalizeComparisonIdentifier(row[group.masterColumn], retailerName);
+                    if (!identifier || masterMap.has(identifier)) return;
+                    masterMap.set(identifier, row);
+                });
+
+                const clientMap = new Map();
+                clientSheetConfig.rows.forEach((row) => {
+                    const identifier = normalizeComparisonIdentifier(row[group.clientColumn], retailerName);
+                    if (!identifier || clientMap.has(identifier)) return;
+                    clientMap.set(identifier, row);
+                });
+
+                let existingCount = 0;
+                let notTrackedCount = 0;
+                clientMap.forEach((row, identifier) => {
+                    const clientRowKey = getClientRowKey(row);
+                    const statusHeader = `Status - ${retailerName}`;
+                    const matchedMasterRow = masterMap.get(identifier);
+                    const entry = coverageEntries.get(clientRowKey) || {
+                        baseRow: row,
+                        existingProfiteroUrl: '',
+                        statuses: {}
+                    };
+                    if (matchedMasterRow) {
+                        existingCount += 1;
+                        entry.statuses[statusHeader] = 'Existing';
+                        if (!entry.existingProfiteroUrl) {
+                            entry.existingProfiteroUrl = getExistingProfiteroUrl(matchedMasterRow, comparisonState.masterHeaders);
+                        }
+                    } else {
+                        notTrackedCount += 1;
+                        entry.statuses[statusHeader] = 'Not Tracked';
+                    }
+                    coverageEntries.set(clientRowKey, entry);
+                });
+
+                groupSummaries.push({
+                    retailerName,
+                    clientSheet: group.clientSheet,
+                    existingCount,
+                    notTrackedCount
+                });
+            });
+
+            const coverageHeaders = ['Existing Profitero URL', 'Client Sheet', ...comparisonState.clientHeaders, ...statusHeaders];
+            const coverageRows = Array.from(coverageEntries.values()).map((entry) => {
+                const row = {
+                    'Existing Profitero URL': entry.existingProfiteroUrl,
+                    'Client Sheet': entry.baseRow.__clientSheet || ''
+                };
+                comparisonState.clientHeaders.forEach((header) => {
+                    row[header] = entry.baseRow[header] ?? '';
+                });
+                statusHeaders.forEach((header) => {
+                    row[header] = entry.statuses[header] || '';
+                });
+                return row;
+            });
+
+            return {
+                validGroups,
+                comparisonScope,
+                coverageHeaders,
+                statusHeaders,
+                coverageRows: uniqueRowsByHeaders(coverageRows, coverageHeaders),
+                groupSummaries
+            };
+        }
+
         async function processClientComparison() {
             const status = document.getElementById('statusComparison');
 
@@ -3037,6 +3131,35 @@
                     result.additionsOnly
                         ? `Export complete. ${result.additions.length} additions were written across ${result.validGroups.length} comparison groups. Removal check was skipped.`
                         : `Export complete. ${result.additions.length} additions and ${result.removals.length} removals were written across ${result.validGroups.length} comparison groups.`,
+                    'success'
+                );
+            } catch (error) {
+                showStatus(status, `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function exportClientCoverageCheck() {
+            const status = document.getElementById('statusComparison');
+
+            try {
+                showStatus(status, 'Comparing client rows against master and marking existing versus not tracked...', 'loading');
+                const result = buildClientCoverageResult();
+                const workbookOut = XLSX.utils.book_new();
+                const coverageMatrix = [
+                    result.coverageHeaders,
+                    ...result.coverageRows.map((row) => result.coverageHeaders.map((header) => row[header] !== undefined ? row[header] : ''))
+                ];
+                const coverageSheet = XLSX.utils.aoa_to_sheet(coverageMatrix);
+                applySheetStyles(coverageSheet, coverageMatrix);
+                applyStatusCellColors(coverageSheet, coverageMatrix, result.statusHeaders);
+                XLSX.utils.book_append_sheet(workbookOut, coverageSheet, 'Coverage Check');
+                XLSX.writeFile(workbookOut, 'client_file_coverage_check.xlsx');
+
+                const totalExisting = result.groupSummaries.reduce((sum, item) => sum + item.existingCount, 0);
+                const totalNotTracked = result.groupSummaries.reduce((sum, item) => sum + item.notTrackedCount, 0);
+                showStatus(
+                    status,
+                    `Coverage export complete. ${result.coverageRows.length} client rows were written. Existing matches: ${totalExisting}. Not tracked: ${totalNotTracked}. Scope: ${result.comparisonScope}.`,
                     'success'
                 );
             } catch (error) {
