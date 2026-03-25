@@ -2520,6 +2520,26 @@
             });
         }
 
+        function applyCategoryRequestStyles(worksheet, matrix) {
+            if (!matrix.length) return;
+            const removeIndex = matrix[0].indexOf('Remove Category');
+            const addIndex = matrix[0].indexOf('Add New Category');
+            [removeIndex, addIndex].forEach((columnIndex) => {
+                if (columnIndex === -1) return;
+                for (let rowIndex = 1; rowIndex < matrix.length; rowIndex += 1) {
+                    const value = String(matrix[rowIndex][columnIndex] ?? '').trim();
+                    if (!value) continue;
+                    const cellAddress = XLSX.utils.encode_cell({ r: rowIndex, c: columnIndex });
+                    if (!worksheet[cellAddress]) continue;
+                    worksheet[cellAddress].s = worksheet[cellAddress].s || {};
+                    worksheet[cellAddress].s.font = { bold: true, color: { rgb: '1F1F1F' } };
+                    worksheet[cellAddress].s.fill = {
+                        fgColor: { rgb: columnIndex === removeIndex ? 'F6D1CF' : 'CDEFD8' }
+                    };
+                }
+            });
+        }
+
         function processRemovalSuggestionMatrix(matrix) {
             if (!matrix.length) throw new Error('The removal suggestion sheet is empty');
             const headers = makeUniqueHeaders(matrix[0]);
@@ -3960,9 +3980,10 @@
                 };
             });
 
-            const requestMap = new Map();
+            const requestHeaders = [...categoryFilterState.headers, 'Matched Category', 'Remove Category', 'Add New Category'];
+            const requestRows = [];
             if (prependCategory.trim()) {
-                outputRows.forEach((row) => {
+                filteredRows.forEach((row) => {
                     const updates = getMatchedCategoryUpdates(
                         row,
                         categoryFilterState.categoryColumns,
@@ -3973,33 +3994,17 @@
                     updates
                         .filter((update) => update.oldCombined !== update.newCombined)
                         .forEach((update) => {
-                            const removeKey = `Remove::${update.oldCombined}`;
-                            if (!requestMap.has(removeKey)) {
-                                requestMap.set(removeKey, {
-                                    Action: 'Remove',
-                                    'Category Path': update.oldCombined,
-                                    'Matched Category': update.matchedNode,
-                                    'Inserted Layer': prependCategory.trim(),
-                                    'Previous Category Path': update.oldCombined,
-                                    'Updated Category Path': update.newCombined
-                                });
-                            }
-                            const addKey = `Add::${update.newCombined}`;
-                            if (!requestMap.has(addKey)) {
-                                requestMap.set(addKey, {
-                                    Action: 'Add',
-                                    'Category Path': update.newCombined,
-                                    'Matched Category': update.matchedNode,
-                                    'Inserted Layer': prependCategory.trim(),
-                                    'Previous Category Path': update.oldCombined,
-                                    'Updated Category Path': update.newCombined
-                                });
-                            }
+                            const requestRow = {};
+                            categoryFilterState.headers.forEach((header) => {
+                                requestRow[header] = row[header] ?? '';
+                            });
+                            requestRow['Matched Category'] = update.matchedNode;
+                            requestRow['Remove Category'] = update.oldCombined;
+                            requestRow['Add New Category'] = update.newCombined;
+                            requestRows.push(requestRow);
                         });
                 });
             }
-            const requestRows = Array.from(requestMap.values());
-            const requestHeaders = ['Action', 'Category Path', 'Matched Category', 'Inserted Layer', 'Previous Category Path', 'Updated Category Path'];
 
             return {
                 selected,
@@ -4035,10 +4040,11 @@
                 const requestSheet = XLSX.utils.aoa_to_sheet(requestMatrix);
                 applySheetStyles(worksheetOut, matrix);
                 applySheetStyles(requestSheet, requestMatrix);
+                applyCategoryRequestStyles(requestSheet, requestMatrix);
                 XLSX.utils.book_append_sheet(workbookOut, worksheetOut, 'Filtered Products');
                 XLSX.utils.book_append_sheet(workbookOut, requestSheet, 'Request Format');
                 XLSX.writeFile(workbookOut, `filtered_products_${sanitizeFileName(selected.join('_'), 'selection')}.xlsx`);
-                showStatus(status, `Export complete. ${outputRows.length} matched rows were written with old/new category paths, plus ${requestRows.length} request actions for ticket submission.`, 'success');
+                showStatus(status, `Export complete. ${outputRows.length} matched rows were written, plus ${requestRows.length} request rows with full product information for ticket submission.`, 'success');
             } catch (error) {
                 showStatus(status, `Error: ${error.message}`, 'error');
             }
@@ -4061,9 +4067,10 @@
                 const workbookOut = XLSX.utils.book_new();
                 const requestSheet = XLSX.utils.aoa_to_sheet(requestMatrix);
                 applySheetStyles(requestSheet, requestMatrix);
+                applyCategoryRequestStyles(requestSheet, requestMatrix);
                 XLSX.utils.book_append_sheet(workbookOut, requestSheet, 'Request Format');
                 XLSX.writeFile(workbookOut, `category_request_${sanitizeFileName(selected.join('_'), 'selection')}.xlsx`);
-                showStatus(status, `Request export complete. ${requestRows.length} add/remove actions were written for backend ticket submission.`, 'success');
+                showStatus(status, `Request export complete. ${requestRows.length} rows with full product information were written for backend ticket submission.`, 'success');
             } catch (error) {
                 showStatus(status, `Error: ${error.message}`, 'error');
             }
@@ -4093,10 +4100,19 @@
                     </div>
                 `).join('');
 
+                const requestPreview = requestRows.slice(0, 3).map((row, index) => `
+                    <div class="preview-row">
+                        <strong>Request Row ${index + 1}</strong><br>
+                        Matched Category: ${escapeHtml(row['Matched Category'])}<br>
+                        Remove Category: ${escapeHtml(row['Remove Category'])}<br>
+                        Add New Category: ${escapeHtml(row['Add New Category'])}
+                    </div>
+                `).join('');
+
                 showPreview(
                     preview,
                     `<div class="preview-title">Matched rows: ${outputRows.length}</div>
-                     <div class="preview-row">Separator in use: <strong>${escapeHtml(separator)}</strong><br>Request actions prepared: <strong>${requestRows.length}</strong></div>${rows}`
+                     <div class="preview-row">Separator in use: <strong>${escapeHtml(separator)}</strong><br>Request rows prepared: <strong>${requestRows.length}</strong></div>${rows}${requestPreview}`
                 );
             } catch (error) {
                 showPreview(preview, `<div class="preview-title">Preview error</div><div class="preview-row">${escapeHtml(error.message)}</div>`);
