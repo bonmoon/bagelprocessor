@@ -1875,18 +1875,76 @@
             return headers.slice(0, Math.min(6, headers.length));
         }
 
-        function getRowCategoryValues(row, categoryColumns) {
-            return categoryColumns
-                .map((column) => row[column])
-                .filter((value) => !isEmptyCell(value))
-                .map((value) => String(value).trim());
+        function getCategorySegmentsFromValue(value) {
+            if (isEmptyCell(value)) return [];
+            const text = String(value).trim();
+            if (!text) return [];
+            if (text.includes('***')) {
+                return text.split(/\s*\*\*\*\s*/).map((segment) => segment.trim()).filter(Boolean);
+            }
+            return [text];
         }
 
-        function buildCombinedCategory(row, categoryColumns, prependCategory, separator) {
+        function getRowCategoryEntries(row, categoryColumns) {
+            return categoryColumns
+                .map((column) => {
+                    const rawValue = row[column];
+                    if (isEmptyCell(rawValue)) return null;
+                    const raw = String(rawValue).trim();
+                    const segments = getCategorySegmentsFromValue(rawValue);
+                    return {
+                        column,
+                        raw,
+                        segments,
+                        isCompositePath: segments.length > 1
+                    };
+                })
+                .filter(Boolean);
+        }
+
+        function getRowCategoryValues(row, categoryColumns) {
+            const uniqueValues = new Set();
+            getRowCategoryEntries(row, categoryColumns).forEach((entry) => {
+                const parts = entry.segments.length ? entry.segments : [entry.raw];
+                parts.forEach((part) => {
+                    const normalized = String(part).trim();
+                    if (normalized) uniqueValues.add(normalized);
+                });
+            });
+            return Array.from(uniqueValues);
+        }
+
+        function getMatchedCombinedCategories(row, categoryColumns, selectedValues, prependCategory, separator) {
             const prefix = prependCategory.trim();
-            const values = getRowCategoryValues(row, categoryColumns);
+            const selectedSet = new Set(selectedValues.map((value) => normalizeIdentifier(value)));
+            const entries = getRowCategoryEntries(row, categoryColumns);
+            if (!entries.length || !selectedSet.size) return [];
+
+            const hasCompositePaths = entries.some((entry) => entry.isCompositePath);
+            if (hasCompositePaths) {
+                const matched = entries
+                    .filter((entry) => {
+                        const rawMatch = selectedSet.has(normalizeIdentifier(entry.raw));
+                        const segmentMatch = entry.segments.some((segment) => selectedSet.has(normalizeIdentifier(segment)));
+                        return rawMatch || segmentMatch;
+                    })
+                    .map((entry) => {
+                        const baseSegments = entry.segments.length ? entry.segments : [entry.raw];
+                        const combinedSegments = prefix ? [prefix, ...baseSegments] : baseSegments;
+                        return combinedSegments.join(separator);
+                    });
+                return Array.from(new Set(matched));
+            }
+
+            const values = entries.map((entry) => entry.raw);
+            const hasSelectedValue = values.some((value) => selectedSet.has(normalizeIdentifier(value)));
+            if (!hasSelectedValue) return [];
             const combined = prefix ? [prefix, ...values] : values;
-            return combined.join(separator);
+            return [combined.join(separator)];
+        }
+
+        function buildCombinedCategory(row, categoryColumns, selectedValues, prependCategory, separator) {
+            return getMatchedCombinedCategories(row, categoryColumns, selectedValues, prependCategory, separator).join(' || ');
         }
 
         function sanitizeFileName(value, fallback) {
@@ -3725,21 +3783,30 @@
             const separator = document.getElementById('categorySeparatorInput').value || ' *** ';
             const prependCategory = document.getElementById('prependCategoryInput').value || '';
             const cleanedRows = filterRowsWithContent(categoryFilterState.processedData, categoryFilterState.headers);
-            const selectedLower = selected.map((value) => value.toLowerCase());
+                const filteredRows = cleanedRows.filter((row) => {
+                    return getMatchedCombinedCategories(
+                        row,
+                        categoryFilterState.categoryColumns,
+                        selected,
+                        prependCategory,
+                        separator
+                    ).length > 0;
+                });
 
-            const filteredRows = cleanedRows.filter((row) => {
-                const values = getRowCategoryValues(row, categoryFilterState.categoryColumns).map((value) => value.toLowerCase());
-                return values.some((value) => selectedLower.includes(value));
-            });
-
-            const outputHeaders = [...categoryFilterState.headers, 'Combined Category'];
-            const outputRows = filteredRows.map((row) => {
-                const combinedCategory = buildCombinedCategory(row, categoryFilterState.categoryColumns, prependCategory, separator);
-                return {
-                    ...row,
-                    'Combined Category': combinedCategory
-                };
-            });
+                const outputHeaders = [...categoryFilterState.headers, 'Combined Category'];
+                const outputRows = filteredRows.map((row) => {
+                    const combinedCategory = buildCombinedCategory(
+                        row,
+                        categoryFilterState.categoryColumns,
+                        selected,
+                        prependCategory,
+                        separator
+                    );
+                    return {
+                        ...row,
+                        'Combined Category': combinedCategory
+                    };
+                });
 
             return {
                 selected,
