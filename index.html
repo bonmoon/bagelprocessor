@@ -1174,11 +1174,11 @@
                             <h2 class="module-title">Category Filter and Hierarchy Update</h2>
                         </div>
                     </div>
-                    <p class="module-copy">Filter products by multiple category nodes at once, then optionally prepend a new top-level category and export the updated combined path.</p>
+                    <p class="module-copy">Filter products by multiple category nodes at once, insert a new hierarchy layer before the matched node, and export product-ready plus request-ready outputs.</p>
                     <div class="feature-list">
                         <div class="feature-badge">Multi-select category filter</div>
-                        <div class="feature-badge">Combined Category column</div>
-                        <div class="feature-badge">Top-level prepend support</div>
+                        <div class="feature-badge">Insert-before-node logic</div>
+                        <div class="feature-badge">Request ticket export</div>
                     </div>
                     <div class="panel">
                         <div class="field-grid">
@@ -1205,8 +1205,8 @@
                                 <div class="chips" id="categorySelectedChips"></div>
                             </div>
                             <div class="field">
-                                <label for="prependCategoryInput">New top-level category</label>
-                                <input type="text" id="prependCategoryInput" placeholder="Optional, for example H">
+                                <label for="prependCategoryInput">New hierarchy layer</label>
+                                <input type="text" id="prependCategoryInput" placeholder="Optional, inserted before the matched category node">
                             </div>
                             <div class="field">
                                 <label for="categorySeparatorInput">Combined separator</label>
@@ -1215,7 +1215,7 @@
                         </div>
                         <p class="helper-text" style="margin-top: 12px;">
                             Matching logic checks every column whose header contains <strong>Category</strong> or <strong>Level</strong>.
-                            A row is included when any selected value appears at any category layer.
+                            A row is included when any selected value appears at any category layer. If you enter a new hierarchy layer, it will be inserted immediately before the matched category node inside the affected category path.
                         </p>
                         <div class="mini-stats">
                             <div class="mini-stat">
@@ -1234,6 +1234,7 @@
                         <div class="actions">
                             <button class="btn btn-primary" onclick="processCategoryFilter()">Filter and Export</button>
                             <button class="btn" onclick="previewCategoryFilter()">Preview Matches</button>
+                            <button class="btn" onclick="exportCategoryRequestFormat()">Export Request Format</button>
                         </div>
                         <div id="statusCategoryFilter" class="status"></div>
                         <div id="previewCategoryFilter" class="preview"></div>
@@ -1914,8 +1915,8 @@
             return Array.from(uniqueValues);
         }
 
-        function getMatchedCombinedCategories(row, categoryColumns, selectedValues, prependCategory, separator) {
-            const prefix = prependCategory.trim();
+        function getMatchedCategoryUpdates(row, categoryColumns, selectedValues, insertedLayer, separator) {
+            const layer = insertedLayer.trim();
             const selectedSet = new Set(selectedValues.map((value) => normalizeIdentifier(value)));
             const entries = getRowCategoryEntries(row, categoryColumns);
             if (!entries.length || !selectedSet.size) return [];
@@ -1923,28 +1924,51 @@
             const hasCompositePaths = entries.some((entry) => entry.isCompositePath);
             if (hasCompositePaths) {
                 const matched = entries
-                    .filter((entry) => {
-                        const rawMatch = selectedSet.has(normalizeIdentifier(entry.raw));
-                        const segmentMatch = entry.segments.some((segment) => selectedSet.has(normalizeIdentifier(segment)));
-                        return rawMatch || segmentMatch;
-                    })
                     .map((entry) => {
-                        const baseSegments = entry.segments.length ? entry.segments : [entry.raw];
-                        const combinedSegments = prefix ? [prefix, ...baseSegments] : baseSegments;
-                        return combinedSegments.join(separator);
-                    });
-                return Array.from(new Set(matched));
+                        const rawMatch = selectedSet.has(normalizeIdentifier(entry.raw));
+                        const segmentIndex = entry.segments.findIndex((segment) => selectedSet.has(normalizeIdentifier(segment)));
+                        if (!rawMatch && segmentIndex === -1) return null;
+                        const insertIndex = segmentIndex !== -1 ? segmentIndex : 0;
+                        const matchedNode = entry.segments[insertIndex] || entry.raw;
+                        const oldCombined = entry.segments.join(separator);
+                        const nextSegments = [...entry.segments];
+                        if (layer) nextSegments.splice(insertIndex, 0, layer);
+                        return {
+                            column: entry.column,
+                            matchedNode,
+                            oldCombined,
+                            newCombined: nextSegments.join(separator)
+                        };
+                    })
+                    .filter(Boolean);
+                const uniqueMatched = new Map();
+                matched.forEach((item) => {
+                    const key = `${item.column}::${item.oldCombined}::${item.newCombined}`;
+                    if (!uniqueMatched.has(key)) uniqueMatched.set(key, item);
+                });
+                return Array.from(uniqueMatched.values());
             }
 
             const values = entries.map((entry) => entry.raw);
-            const hasSelectedValue = values.some((value) => selectedSet.has(normalizeIdentifier(value)));
-            if (!hasSelectedValue) return [];
-            const combined = prefix ? [prefix, ...values] : values;
-            return [combined.join(separator)];
+            const insertIndex = values.findIndex((value) => selectedSet.has(normalizeIdentifier(value)));
+            if (insertIndex === -1) return [];
+            const nextValues = [...values];
+            if (layer) nextValues.splice(insertIndex, 0, layer);
+            return [{
+                column: entries[insertIndex]?.column || '',
+                matchedNode: values[insertIndex],
+                oldCombined: values.join(separator),
+                newCombined: nextValues.join(separator)
+            }];
         }
 
-        function buildCombinedCategory(row, categoryColumns, selectedValues, prependCategory, separator) {
-            return getMatchedCombinedCategories(row, categoryColumns, selectedValues, prependCategory, separator).join(' || ');
+        function getMatchedCombinedCategories(row, categoryColumns, selectedValues, insertedLayer, separator) {
+            return getMatchedCategoryUpdates(row, categoryColumns, selectedValues, insertedLayer, separator)
+                .map((item) => item.newCombined);
+        }
+
+        function buildCombinedCategory(row, categoryColumns, selectedValues, insertedLayer, separator) {
+            return getMatchedCombinedCategories(row, categoryColumns, selectedValues, insertedLayer, separator).join(' || ');
         }
 
         function sanitizeFileName(value, fallback) {
@@ -3783,37 +3807,85 @@
             const separator = document.getElementById('categorySeparatorInput').value || ' *** ';
             const prependCategory = document.getElementById('prependCategoryInput').value || '';
             const cleanedRows = filterRowsWithContent(categoryFilterState.processedData, categoryFilterState.headers);
-                const filteredRows = cleanedRows.filter((row) => {
-                    return getMatchedCombinedCategories(
-                        row,
-                        categoryFilterState.categoryColumns,
-                        selected,
-                        prependCategory,
-                        separator
-                    ).length > 0;
-                });
+            const filteredRows = cleanedRows.filter((row) => {
+                return getMatchedCategoryUpdates(
+                    row,
+                    categoryFilterState.categoryColumns,
+                    selected,
+                    prependCategory,
+                    separator
+                ).length > 0;
+            });
 
-                const outputHeaders = [...categoryFilterState.headers, 'Combined Category'];
-                const outputRows = filteredRows.map((row) => {
-                    const combinedCategory = buildCombinedCategory(
+            const outputHeaders = [...categoryFilterState.headers, 'Matched Category', 'Old Combined Category', 'Combined Category'];
+            const outputRows = filteredRows.map((row) => {
+                const updates = getMatchedCategoryUpdates(
+                    row,
+                    categoryFilterState.categoryColumns,
+                    selected,
+                    prependCategory,
+                    separator
+                );
+                const matchedCategories = updates.map((item) => item.matchedNode).join(' || ');
+                const oldCombinedCategory = updates.map((item) => item.oldCombined).join(' || ');
+                const combinedCategory = updates.map((item) => item.newCombined).join(' || ');
+                return {
+                    ...row,
+                    'Matched Category': matchedCategories,
+                    'Old Combined Category': oldCombinedCategory,
+                    'Combined Category': combinedCategory
+                };
+            });
+
+            const requestMap = new Map();
+            if (prependCategory.trim()) {
+                outputRows.forEach((row) => {
+                    const updates = getMatchedCategoryUpdates(
                         row,
                         categoryFilterState.categoryColumns,
                         selected,
                         prependCategory,
                         separator
                     );
-                    return {
-                        ...row,
-                        'Combined Category': combinedCategory
-                    };
+                    updates
+                        .filter((update) => update.oldCombined !== update.newCombined)
+                        .forEach((update) => {
+                            const removeKey = `Remove::${update.oldCombined}`;
+                            if (!requestMap.has(removeKey)) {
+                                requestMap.set(removeKey, {
+                                    Action: 'Remove',
+                                    'Category Path': update.oldCombined,
+                                    'Matched Category': update.matchedNode,
+                                    'Inserted Layer': prependCategory.trim(),
+                                    'Previous Category Path': update.oldCombined,
+                                    'Updated Category Path': update.newCombined
+                                });
+                            }
+                            const addKey = `Add::${update.newCombined}`;
+                            if (!requestMap.has(addKey)) {
+                                requestMap.set(addKey, {
+                                    Action: 'Add',
+                                    'Category Path': update.newCombined,
+                                    'Matched Category': update.matchedNode,
+                                    'Inserted Layer': prependCategory.trim(),
+                                    'Previous Category Path': update.oldCombined,
+                                    'Updated Category Path': update.newCombined
+                                });
+                            }
+                        });
                 });
+            }
+            const requestRows = Array.from(requestMap.values());
+            const requestHeaders = ['Action', 'Category Path', 'Matched Category', 'Inserted Layer', 'Previous Category Path', 'Updated Category Path'];
 
             return {
                 selected,
                 separator,
                 prependCategory,
                 outputHeaders,
-                outputRows
+                outputRows,
+                requestHeaders,
+                requestRows
             };
         }
 
@@ -3822,7 +3894,7 @@
 
             try {
                 showStatus(status, 'Filtering rows and building updated category paths...', 'loading');
-                const { selected, outputHeaders, outputRows } = getCategoryFilterResult();
+                const { selected, outputHeaders, outputRows, requestHeaders, requestRows } = getCategoryFilterResult();
                 if (!outputRows.length) {
                     throw new Error(`No rows matched the selected category values: ${selected.join(', ')}`);
                 }
@@ -3831,12 +3903,44 @@
                     outputHeaders,
                     ...outputRows.map((row) => outputHeaders.map((header) => row[header] !== undefined ? row[header] : ''))
                 ];
+                const requestMatrix = [
+                    requestHeaders,
+                    ...requestRows.map((row) => requestHeaders.map((header) => row[header] !== undefined ? row[header] : ''))
+                ];
                 const workbookOut = XLSX.utils.book_new();
                 const worksheetOut = XLSX.utils.aoa_to_sheet(matrix);
+                const requestSheet = XLSX.utils.aoa_to_sheet(requestMatrix);
                 applySheetStyles(worksheetOut, matrix);
+                applySheetStyles(requestSheet, requestMatrix);
                 XLSX.utils.book_append_sheet(workbookOut, worksheetOut, 'Filtered Products');
+                XLSX.utils.book_append_sheet(workbookOut, requestSheet, 'Request Format');
                 XLSX.writeFile(workbookOut, `filtered_products_${sanitizeFileName(selected.join('_'), 'selection')}.xlsx`);
-                showStatus(status, `Export complete. ${outputRows.length} matched rows were written with a Combined Category column.`, 'success');
+                showStatus(status, `Export complete. ${outputRows.length} matched rows were written with old/new category paths, plus ${requestRows.length} request actions for ticket submission.`, 'success');
+            } catch (error) {
+                showStatus(status, `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function exportCategoryRequestFormat() {
+            const status = document.getElementById('statusCategoryFilter');
+
+            try {
+                showStatus(status, 'Building request-ready add and remove category actions...', 'loading');
+                const { selected, requestHeaders, requestRows } = getCategoryFilterResult();
+                if (!requestRows.length) {
+                    throw new Error(`No request actions were produced for the selected category values: ${selected.join(', ')}`);
+                }
+
+                const requestMatrix = [
+                    requestHeaders,
+                    ...requestRows.map((row) => requestHeaders.map((header) => row[header] !== undefined ? row[header] : ''))
+                ];
+                const workbookOut = XLSX.utils.book_new();
+                const requestSheet = XLSX.utils.aoa_to_sheet(requestMatrix);
+                applySheetStyles(requestSheet, requestMatrix);
+                XLSX.utils.book_append_sheet(workbookOut, requestSheet, 'Request Format');
+                XLSX.writeFile(workbookOut, `category_request_${sanitizeFileName(selected.join('_'), 'selection')}.xlsx`);
+                showStatus(status, `Request export complete. ${requestRows.length} add/remove actions were written for backend ticket submission.`, 'success');
             } catch (error) {
                 showStatus(status, `Error: ${error.message}`, 'error');
             }
@@ -3846,7 +3950,7 @@
             const preview = document.getElementById('previewCategoryFilter');
 
             try {
-                const { selected, prependCategory, separator, outputRows } = getCategoryFilterResult();
+                const { selected, prependCategory, separator, outputRows, requestRows } = getCategoryFilterResult();
                 categoryFilterState.matchedCount = outputRows.length;
                 document.getElementById('categoryMatchedCount').textContent = String(outputRows.length);
 
@@ -3859,7 +3963,9 @@
                     <div class="preview-row">
                         <strong>Row ${index + 1}</strong><br>
                         Selected nodes: ${escapeHtml(selected.join(', '))}<br>
-                        ${prependCategory ? `Prepended top-level category: ${escapeHtml(prependCategory)}<br>` : ''}
+                        ${prependCategory ? `Inserted layer before matched node: ${escapeHtml(prependCategory)}<br>` : ''}
+                        Matched Category: ${escapeHtml(row['Matched Category'])}<br>
+                        Old Combined Category: ${escapeHtml(row['Old Combined Category'])}<br>
                         Combined Category: ${escapeHtml(row['Combined Category'])}
                     </div>
                 `).join('');
@@ -3867,7 +3973,7 @@
                 showPreview(
                     preview,
                     `<div class="preview-title">Matched rows: ${outputRows.length}</div>
-                     <div class="preview-row">Separator in use: <strong>${escapeHtml(separator)}</strong></div>${rows}`
+                     <div class="preview-row">Separator in use: <strong>${escapeHtml(separator)}</strong><br>Request actions prepared: <strong>${requestRows.length}</strong></div>${rows}`
                 );
             } catch (error) {
                 showPreview(preview, `<div class="preview-title">Preview error</div><div class="preview-row">${escapeHtml(error.message)}</div>`);
