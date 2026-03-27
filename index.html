@@ -1239,6 +1239,15 @@
                         <div class="subsection">
                             <div class="subsection-title">Grouped Product Extraction</div>
                             <div class="subsection-copy">Build one or more extraction groups to pull products by category node, optional brand, and owner, then merge all matched rows into one export sheet.</div>
+                            <div class="field-grid" style="margin-bottom: 12px;">
+                                <div class="field">
+                                    <label>Export mode</label>
+                                    <select class="select-input" id="categoryExtractionExportMode" onchange="updateCategoryExtractionExportMode(this.value)">
+                                        <option value="merged">Merge all groups into one sheet</option>
+                                        <option value="separate">Put each group in a separate sheet</option>
+                                    </select>
+                                </div>
+                            </div>
                             <div class="config-actions">
                                 <button class="btn btn-subtle" type="button" onclick="addCategoryExtractionGroup()">Add Extraction Group</button>
                             </div>
@@ -1606,7 +1615,8 @@
             brandOptions: [],
             selectedCategories: new Set(),
             matchedCount: 0,
-            extractionGroups: []
+            extractionGroups: [],
+            extractionExportMode: 'merged'
         };
         const comparisonState = {
             masterWorkbook: null,
@@ -3861,6 +3871,8 @@
 
                 document.getElementById('categoryOptionCount').textContent = String(categoryFilterState.categoryOptions.length);
                 document.getElementById('categoryMatchedCount').textContent = '0';
+                const extractionModeSelect = document.getElementById('categoryExtractionExportMode');
+                if (extractionModeSelect) extractionModeSelect.value = categoryFilterState.extractionExportMode;
                 renderCategoryOptions();
                 updateCategorySelectorUI();
                 renderCategoryExtractionGroups();
@@ -3977,7 +3989,7 @@
                 id: seed.id || `cat_extract_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
                 label: seed.label || '',
                 categoryNode: seed.categoryNode || '',
-                brandValue: seed.brandValue || '',
+                brandValues: Array.isArray(seed.brandValues) ? seed.brandValues : (seed.brandValue ? [seed.brandValue] : []),
                 ownerFilter: seed.ownerFilter || 'client'
             };
         }
@@ -3996,6 +4008,19 @@
             const group = categoryFilterState.extractionGroups.find((item) => item.id === groupId);
             if (!group) return;
             group[field] = value;
+        }
+
+        function updateCategoryExtractionExportMode(value) {
+            categoryFilterState.extractionExportMode = value || 'merged';
+        }
+
+        function updateCategoryExtractionGroupBrands(groupId, selectElement) {
+            const selectedValues = Array.from(selectElement.selectedOptions)
+                .map((option) => option.value)
+                .filter(Boolean);
+            const group = categoryFilterState.extractionGroups.find((item) => item.id === groupId);
+            if (!group) return;
+            group.brandValues = selectedValues;
         }
 
         function renderCategoryExtractionGroups() {
@@ -4036,12 +4061,13 @@
                             </select>
                         </div>
                         <div class="field">
-                            <label>${hasBrandColumn ? 'Brand filter' : 'Brand filter'}</label>
+                            <label>Brand filter</label>
                             ${hasBrandColumn
-                                ? `<select class="select-input" onchange="updateCategoryExtractionGroup('${group.id}', 'brandValue', this.value)">
-                                    ${buildSelectOptions([{ value: '', label: 'Any brand' }, ...brandOptions.map((option) => ({ value: option, label: option }))], group.brandValue, 'Any brand')}
-                                   </select>`
-                                : `<input type="text" value="${escapeHtml(group.brandValue)}" placeholder="No brand column detected in this workbook" oninput="updateCategoryExtractionGroup('${group.id}', 'brandValue', this.value)">`
+                                ? `<select class="select-input" multiple size="${Math.min(6, Math.max(3, brandOptions.length || 3))}" onchange="updateCategoryExtractionGroupBrands('${group.id}', this)">
+                                    ${brandOptions.map((option) => `<option value="${escapeHtml(option)}" ${group.brandValues.includes(option) ? 'selected' : ''}>${escapeHtml(option)}</option>`).join('')}
+                                   </select>
+                                   <div class="helper-text">Leave unselected to match any brand. You can select multiple brands.</div>`
+                                : `<input type="text" value="${escapeHtml((group.brandValues || []).join(', '))}" placeholder="No brand column detected in this workbook" oninput="updateCategoryExtractionGroup('${group.id}', 'brandValues', this.value ? this.value.split(',').map(v => v.trim()).filter(Boolean) : [])">`
                             }
                         </div>
                     </div>
@@ -4147,17 +4173,19 @@
             const resultHeaders = ['Extraction Group', 'Owner Filter', 'Category Node', 'Brand Filter', ...categoryFilterState.headers];
             const resultRows = [];
             const groupSummaries = [];
+            const groupSheets = [];
 
             groups.forEach((group, index) => {
                 const label = group.label.trim() || `Extraction Group ${index + 1}`;
+                const normalizedBrands = (group.brandValues || []).map((value) => normalizeIdentifier(value)).filter(Boolean);
                 const matchedRows = cleanedRows.filter((row) => {
                     const ownerValue = normalizeIdentifier(row[ownerColumn]);
                     if (ownerValue !== normalizeIdentifier(group.ownerFilter)) return false;
 
-                    if (group.brandValue) {
+                    if (normalizedBrands.length) {
                         if (!categoryFilterState.brandColumn) return false;
                         const brandValue = normalizeIdentifier(row[categoryFilterState.brandColumn]);
-                        if (brandValue !== normalizeIdentifier(group.brandValue)) return false;
+                        if (!normalizedBrands.includes(brandValue)) return false;
                     }
 
                     return getMatchedCategoryUpdates(
@@ -4169,24 +4197,29 @@
                     ).length > 0;
                 });
 
-                matchedRows.forEach((row) => {
+                const groupRows = matchedRows.map((row) => {
                     const resultRow = {
                         'Extraction Group': label,
                         'Owner Filter': group.ownerFilter,
                         'Category Node': group.categoryNode,
-                        'Brand Filter': group.brandValue || 'Any'
+                        'Brand Filter': normalizedBrands.length ? (group.brandValues || []).join(' | ') : 'Any'
                     };
                     categoryFilterState.headers.forEach((header) => {
                         resultRow[header] = row[header] ?? '';
                     });
-                    resultRows.push(resultRow);
+                    return resultRow;
+                });
+                resultRows.push(...groupRows);
+                groupSheets.push({
+                    sheetName: label.substring(0, 31) || `Group_${index + 1}`,
+                    rows: groupRows
                 });
 
                 groupSummaries.push({
                     label,
                     ownerFilter: group.ownerFilter,
                     categoryNode: group.categoryNode,
-                    brandValue: group.brandValue || 'Any',
+                    brandValue: normalizedBrands.length ? (group.brandValues || []).join(' | ') : 'Any',
                     matchedCount: matchedRows.length
                 });
             });
@@ -4194,7 +4227,8 @@
             return {
                 resultHeaders,
                 resultRows,
-                groupSummaries
+                groupSummaries,
+                groupSheets
             };
         }
 
@@ -4241,16 +4275,34 @@
                     throw new Error('No rows matched the configured extraction groups');
                 }
 
-                const matrix = [
-                    result.resultHeaders,
-                    ...result.resultRows.map((row) => result.resultHeaders.map((header) => row[header] !== undefined ? row[header] : ''))
-                ];
                 const workbookOut = XLSX.utils.book_new();
-                const worksheetOut = XLSX.utils.aoa_to_sheet(matrix);
-                applySheetStyles(worksheetOut, matrix);
-                XLSX.utils.book_append_sheet(workbookOut, worksheetOut, 'Extracted Products');
+                if (categoryFilterState.extractionExportMode === 'separate') {
+                    result.groupSheets.forEach((groupSheet, index) => {
+                        const matrix = [
+                            result.resultHeaders,
+                            ...groupSheet.rows.map((row) => result.resultHeaders.map((header) => row[header] !== undefined ? row[header] : ''))
+                        ];
+                        const worksheetOut = XLSX.utils.aoa_to_sheet(matrix);
+                        applySheetStyles(worksheetOut, matrix);
+                        XLSX.utils.book_append_sheet(workbookOut, worksheetOut, groupSheet.sheetName || `Group_${index + 1}`);
+                    });
+                } else {
+                    const matrix = [
+                        result.resultHeaders,
+                        ...result.resultRows.map((row) => result.resultHeaders.map((header) => row[header] !== undefined ? row[header] : ''))
+                    ];
+                    const worksheetOut = XLSX.utils.aoa_to_sheet(matrix);
+                    applySheetStyles(worksheetOut, matrix);
+                    XLSX.utils.book_append_sheet(workbookOut, worksheetOut, 'Extracted Products');
+                }
                 XLSX.writeFile(workbookOut, 'category_group_extraction.xlsx');
-                showStatus(status, `Extraction export complete. ${result.resultRows.length} rows were merged into one sheet across ${result.groupSummaries.length} configured groups.`, 'success');
+                showStatus(
+                    status,
+                    categoryFilterState.extractionExportMode === 'separate'
+                        ? `Extraction export complete. ${result.resultRows.length} rows were written across ${result.groupSummaries.length} group sheets.`
+                        : `Extraction export complete. ${result.resultRows.length} rows were merged into one sheet across ${result.groupSummaries.length} configured groups.`,
+                    'success'
+                );
             } catch (error) {
                 showStatus(status, `Error: ${error.message}`, 'error');
             }
@@ -4279,7 +4331,7 @@
                 showPreview(
                     preview,
                     `<div class="preview-title">Grouped extraction preview</div>
-                     <div class="preview-row">Configured groups: ${result.groupSummaries.length} | Total matched rows: ${result.resultRows.length}</div>
+                     <div class="preview-row">Configured groups: ${result.groupSummaries.length} | Total matched rows: ${result.resultRows.length} | Export mode: ${escapeHtml(categoryFilterState.extractionExportMode)}</div>
                      ${summaryRows}
                      ${sampleRows || '<div class="preview-row">No extracted rows matched the current group setup.</div>'}`
                 );
