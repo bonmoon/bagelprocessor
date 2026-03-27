@@ -1236,6 +1236,18 @@
                             <button class="btn" onclick="previewCategoryFilter()">Preview Matches</button>
                             <button class="btn" onclick="exportCategoryRequestFormat()">Export Request Format</button>
                         </div>
+                        <div class="subsection">
+                            <div class="subsection-title">Grouped Product Extraction</div>
+                            <div class="subsection-copy">Build one or more extraction groups to pull products by category node, optional brand, and owner, then merge all matched rows into one export sheet.</div>
+                            <div class="config-actions">
+                                <button class="btn btn-subtle" type="button" onclick="addCategoryExtractionGroup()">Add Extraction Group</button>
+                            </div>
+                            <div id="categoryExtractionList" class="config-list"></div>
+                            <div class="actions">
+                                <button class="btn btn-primary" onclick="processCategoryExtraction()">Export Extracted Products</button>
+                                <button class="btn" onclick="previewCategoryExtraction()">Preview Extraction</button>
+                            </div>
+                        </div>
                         <div id="statusCategoryFilter" class="status"></div>
                         <div id="previewCategoryFilter" class="preview"></div>
                     </div>
@@ -1590,8 +1602,11 @@
             processedData: [],
             categoryColumns: [],
             categoryOptions: [],
+            brandColumn: '',
+            brandOptions: [],
             selectedCategories: new Set(),
-            matchedCount: 0
+            matchedCount: 0,
+            extractionGroups: []
         };
         const comparisonState = {
             masterWorkbook: null,
@@ -3822,23 +3837,33 @@
                 if (!headers.length || !data.length) throw new Error('No product rows were found in the selected workbook');
 
                 const categoryColumns = getCategoryColumnNames(headers);
+                const brandColumn = findBrandColumnName(headers);
                 const optionSet = new Set();
                 data.forEach((row) => {
                     getRowCategoryValues(row, categoryColumns).forEach((value) => optionSet.add(value));
                 });
+                const brandOptions = brandColumn
+                    ? Array.from(new Set(data.map((row) => String(row[brandColumn] ?? '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b))
+                    : [];
 
                 categoryFilterState.workbook = workbook;
                 categoryFilterState.headers = headers;
                 categoryFilterState.processedData = data;
                 categoryFilterState.categoryColumns = categoryColumns;
                 categoryFilterState.categoryOptions = Array.from(optionSet).sort((a, b) => a.localeCompare(b));
+                categoryFilterState.brandColumn = brandColumn;
+                categoryFilterState.brandOptions = brandOptions;
                 categoryFilterState.selectedCategories = new Set();
                 categoryFilterState.matchedCount = 0;
+                if (!categoryFilterState.extractionGroups.length) {
+                    categoryFilterState.extractionGroups = [createCategoryExtractionGroup()];
+                }
 
                 document.getElementById('categoryOptionCount').textContent = String(categoryFilterState.categoryOptions.length);
                 document.getElementById('categoryMatchedCount').textContent = '0';
                 renderCategoryOptions();
                 updateCategorySelectorUI();
+                renderCategoryExtractionGroups();
                 showStatus(status, `Workbook loaded. ${categoryFilterState.categoryOptions.length} category values are ready for multi-select filtering.`, 'success');
             } catch (error) {
                 categoryFilterState.workbook = null;
@@ -3846,10 +3871,14 @@
                 categoryFilterState.processedData = [];
                 categoryFilterState.categoryColumns = [];
                 categoryFilterState.categoryOptions = [];
+                categoryFilterState.brandColumn = '';
+                categoryFilterState.brandOptions = [];
                 categoryFilterState.selectedCategories = new Set();
                 categoryFilterState.matchedCount = 0;
+                categoryFilterState.extractionGroups = [];
                 renderCategoryOptions();
                 updateCategorySelectorUI();
+                renderCategoryExtractionGroups();
                 showStatus(status, `Error: ${error.message}`, 'error');
             }
         }
@@ -3937,6 +3966,89 @@
             `).join('');
         }
 
+        function findBrandColumnName(headers) {
+            return headers.find((header) => String(header).trim().toLowerCase() === 'brand')
+                || headers.find((header) => String(header).toLowerCase().includes('brand'))
+                || '';
+        }
+
+        function createCategoryExtractionGroup(seed = {}) {
+            return {
+                id: seed.id || `cat_extract_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+                label: seed.label || '',
+                categoryNode: seed.categoryNode || '',
+                brandValue: seed.brandValue || '',
+                ownerFilter: seed.ownerFilter || 'client'
+            };
+        }
+
+        function addCategoryExtractionGroup(seed = {}) {
+            categoryFilterState.extractionGroups.push(createCategoryExtractionGroup(seed));
+            renderCategoryExtractionGroups();
+        }
+
+        function removeCategoryExtractionGroup(groupId) {
+            categoryFilterState.extractionGroups = categoryFilterState.extractionGroups.filter((group) => group.id !== groupId);
+            renderCategoryExtractionGroups();
+        }
+
+        function updateCategoryExtractionGroup(groupId, field, value) {
+            const group = categoryFilterState.extractionGroups.find((item) => item.id === groupId);
+            if (!group) return;
+            group[field] = value;
+        }
+
+        function renderCategoryExtractionGroups() {
+            const container = document.getElementById('categoryExtractionList');
+            if (!container) return;
+            if (!categoryFilterState.extractionGroups.length) {
+                container.innerHTML = '<div class="preview-row">No extraction groups yet. Load a workbook, then add one or more groups.</div>';
+                return;
+            }
+
+            const categoryOptions = categoryFilterState.categoryOptions;
+            const brandOptions = categoryFilterState.brandOptions;
+            const hasBrandColumn = Boolean(categoryFilterState.brandColumn);
+            container.innerHTML = categoryFilterState.extractionGroups.map((group, index) => `
+                <div class="config-row">
+                    <div class="config-row-head">
+                        <div class="config-row-title">Extraction Group ${index + 1}</div>
+                        <button class="btn btn-subtle" type="button" onclick="removeCategoryExtractionGroup('${group.id}')">Remove</button>
+                    </div>
+                    <div class="field-grid">
+                        <div class="field">
+                            <label>Group label</label>
+                            <input type="text" value="${escapeHtml(group.label)}" placeholder="Optional label for this extraction group" oninput="updateCategoryExtractionGroup('${group.id}', 'label', this.value)">
+                        </div>
+                        <div class="field">
+                            <label>Owner filter</label>
+                            <select class="select-input" onchange="updateCategoryExtractionGroup('${group.id}', 'ownerFilter', this.value)">
+                                ${buildSelectOptions([
+                                    { value: 'client', label: 'Client' },
+                                    { value: 'competitor', label: 'Competitor' }
+                                ], group.ownerFilter, 'Choose owner')}
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>Category node</label>
+                            <select class="select-input" onchange="updateCategoryExtractionGroup('${group.id}', 'categoryNode', this.value)">
+                                ${buildSelectOptions(categoryOptions, group.categoryNode, 'Choose category node')}
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>${hasBrandColumn ? 'Brand filter' : 'Brand filter'}</label>
+                            ${hasBrandColumn
+                                ? `<select class="select-input" onchange="updateCategoryExtractionGroup('${group.id}', 'brandValue', this.value)">
+                                    ${buildSelectOptions([{ value: '', label: 'Any brand' }, ...brandOptions.map((option) => ({ value: option, label: option }))], group.brandValue, 'Any brand')}
+                                   </select>`
+                                : `<input type="text" value="${escapeHtml(group.brandValue)}" placeholder="No brand column detected in this workbook" oninput="updateCategoryExtractionGroup('${group.id}', 'brandValue', this.value)">`
+                            }
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
         function getCategoryFilterResult() {
             if (!categoryFilterState.processedData.length) {
                 throw new Error('Please upload a workbook for the category filter module');
@@ -4017,6 +4129,75 @@
             };
         }
 
+        function buildCategoryExtractionResult() {
+            if (!categoryFilterState.processedData.length) {
+                throw new Error('Please upload a workbook for the category filter module');
+            }
+            const groups = categoryFilterState.extractionGroups.filter((group) => group.categoryNode);
+            if (!groups.length) {
+                throw new Error('Please configure at least one extraction group with a category node');
+            }
+
+            const ownerColumn = getOwnerColumnName(categoryFilterState.headers);
+            if (!ownerColumn) {
+                throw new Error('Owner column was not found in the loaded workbook');
+            }
+
+            const cleanedRows = filterRowsWithContent(categoryFilterState.processedData, categoryFilterState.headers);
+            const resultHeaders = ['Extraction Group', 'Owner Filter', 'Category Node', 'Brand Filter', ...categoryFilterState.headers];
+            const resultRows = [];
+            const groupSummaries = [];
+
+            groups.forEach((group, index) => {
+                const label = group.label.trim() || `Extraction Group ${index + 1}`;
+                const matchedRows = cleanedRows.filter((row) => {
+                    const ownerValue = normalizeIdentifier(row[ownerColumn]);
+                    if (ownerValue !== normalizeIdentifier(group.ownerFilter)) return false;
+
+                    if (group.brandValue) {
+                        if (!categoryFilterState.brandColumn) return false;
+                        const brandValue = normalizeIdentifier(row[categoryFilterState.brandColumn]);
+                        if (brandValue !== normalizeIdentifier(group.brandValue)) return false;
+                    }
+
+                    return getMatchedCategoryUpdates(
+                        row,
+                        categoryFilterState.categoryColumns,
+                        [group.categoryNode],
+                        '',
+                        document.getElementById('categorySeparatorInput').value || ' *** '
+                    ).length > 0;
+                });
+
+                matchedRows.forEach((row) => {
+                    const resultRow = {
+                        'Extraction Group': label,
+                        'Owner Filter': group.ownerFilter,
+                        'Category Node': group.categoryNode,
+                        'Brand Filter': group.brandValue || 'Any'
+                    };
+                    categoryFilterState.headers.forEach((header) => {
+                        resultRow[header] = row[header] ?? '';
+                    });
+                    resultRows.push(resultRow);
+                });
+
+                groupSummaries.push({
+                    label,
+                    ownerFilter: group.ownerFilter,
+                    categoryNode: group.categoryNode,
+                    brandValue: group.brandValue || 'Any',
+                    matchedCount: matchedRows.length
+                });
+            });
+
+            return {
+                resultHeaders,
+                resultRows,
+                groupSummaries
+            };
+        }
+
         async function processCategoryFilter() {
             const status = document.getElementById('statusCategoryFilter');
 
@@ -4047,6 +4228,63 @@
                 showStatus(status, `Export complete. ${outputRows.length} matched rows were written, plus ${requestRows.length} request rows with full product information for ticket submission.`, 'success');
             } catch (error) {
                 showStatus(status, `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function processCategoryExtraction() {
+            const status = document.getElementById('statusCategoryFilter');
+
+            try {
+                showStatus(status, 'Extracting products by grouped category, brand, and owner filters...', 'loading');
+                const result = buildCategoryExtractionResult();
+                if (!result.resultRows.length) {
+                    throw new Error('No rows matched the configured extraction groups');
+                }
+
+                const matrix = [
+                    result.resultHeaders,
+                    ...result.resultRows.map((row) => result.resultHeaders.map((header) => row[header] !== undefined ? row[header] : ''))
+                ];
+                const workbookOut = XLSX.utils.book_new();
+                const worksheetOut = XLSX.utils.aoa_to_sheet(matrix);
+                applySheetStyles(worksheetOut, matrix);
+                XLSX.utils.book_append_sheet(workbookOut, worksheetOut, 'Extracted Products');
+                XLSX.writeFile(workbookOut, 'category_group_extraction.xlsx');
+                showStatus(status, `Extraction export complete. ${result.resultRows.length} rows were merged into one sheet across ${result.groupSummaries.length} configured groups.`, 'success');
+            } catch (error) {
+                showStatus(status, `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function previewCategoryExtraction() {
+            const preview = document.getElementById('previewCategoryFilter');
+
+            try {
+                const result = buildCategoryExtractionResult();
+                const summaryRows = result.groupSummaries.map((group, index) => `
+                    <div class="preview-row">
+                        <strong>${escapeHtml(group.label)}</strong><br>
+                        Owner: ${escapeHtml(group.ownerFilter)} | Category: ${escapeHtml(group.categoryNode)} | Brand: ${escapeHtml(group.brandValue)}<br>
+                        Matched rows: ${group.matchedCount}
+                    </div>
+                `).join('');
+                const sampleRows = result.resultRows.slice(0, 4).map((row, index) => `
+                    <div class="preview-row">
+                        <strong>Extracted Row ${index + 1}</strong><br>
+                        Group: ${escapeHtml(row['Extraction Group'])}<br>
+                        ${escapeHtml(result.resultHeaders.slice(4, 8).map((header) => `${header}: ${row[header] ?? ''}`).join(' | '))}
+                    </div>
+                `).join('');
+
+                showPreview(
+                    preview,
+                    `<div class="preview-title">Grouped extraction preview</div>
+                     <div class="preview-row">Configured groups: ${result.groupSummaries.length} | Total matched rows: ${result.resultRows.length}</div>
+                     ${summaryRows}
+                     ${sampleRows || '<div class="preview-row">No extracted rows matched the current group setup.</div>'}`
+                );
+            } catch (error) {
+                showPreview(preview, `<div class="preview-title">Extraction preview error</div><div class="preview-row">${escapeHtml(error.message)}</div>`);
             }
         }
 
