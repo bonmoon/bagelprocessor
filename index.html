@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Workbook Operations Hub</title>
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
 
@@ -145,6 +146,7 @@
         .sidebar-group-btn[data-tone="master"] .sidebar-dot { background: #c99672; }
         .sidebar-group-btn[data-tone="comparison"] .sidebar-dot { background: #d18f73; }
         .sidebar-group-btn[data-tone="removal"] .sidebar-dot { background: #88a864; }
+        .sidebar-group-btn[data-tone="imageev"] .sidebar-dot { background: #8d62a8; }
 
         .sidebar-group-btn .sidebar-arrow {
             margin-left: auto;
@@ -503,10 +505,12 @@
         .module-group[data-group="master"] .module-group-illustration { background-image: url('Assets/2.png'); }
         .module-group[data-group="comparison"] .module-group-illustration { background-image: url('Assets/3.png'); }
         .module-group[data-group="removal"] .module-group-illustration { background-image: url('Assets/4.png'); }
+        .module-group[data-group="imageev"] .module-group-illustration { background-image: url('Assets/2.png'); }
         .module-group[data-group="category"]::before { background-image: url('Assets/1.png'); }
         .module-group[data-group="master"]::before { background-image: url('Assets/2.png'); }
         .module-group[data-group="comparison"]::before { background-image: url('Assets/3.png'); }
         .module-group[data-group="removal"]::before { background-image: url('Assets/4.png'); }
+        .module-group[data-group="imageev"]::before { background-image: url('Assets/2.png'); }
 
         .module-group-heading h2 {
             font-size: 1.3rem;
@@ -1315,6 +1319,361 @@
             font-weight: 700;
             color: var(--text);
         }
+
+        /* Summer city visual refresh */
+        :root {
+            --bg: #f7f2e7;
+            --bg-strong: #e8f1f5;
+            --surface: #fffdf7;
+            --surface-strong: #ffffff;
+            --line: rgba(9, 65, 99, 0.14);
+            --text: #103e5c;
+            --muted: #5d7483;
+            --accent: #0e648f;
+            --accent-strong: #08476c;
+            --accent-soft: rgba(91, 164, 197, 0.14);
+            --gold: #ed8a2f;
+            --error: #b9573f;
+            --success: #28765e;
+            --shadow: 0 14px 34px rgba(22, 73, 101, 0.09);
+        }
+
+        body {
+            background-color: #f8f3e9;
+            background-image: repeating-linear-gradient(
+                90deg,
+                rgba(169, 207, 224, 0.2) 0,
+                rgba(169, 207, 224, 0.2) 18px,
+                rgba(255, 253, 247, 0.72) 18px,
+                rgba(255, 253, 247, 0.72) 42px
+            );
+        }
+
+        body::before {
+            display: none;
+        }
+
+        .sidebar {
+            background: #fffdf7;
+            border-right: 2px solid #a9cfe0;
+            backdrop-filter: none;
+            box-shadow: 8px 0 28px rgba(30, 86, 116, 0.06);
+        }
+
+        .sidebar-brand {
+            border-bottom-color: var(--line);
+        }
+
+        .sidebar-brand h1,
+        .hero h1,
+        .module-group-heading h2,
+        .guide-accordion h2 {
+            font-family: Georgia, 'Times New Roman', serif;
+            letter-spacing: -0.025em;
+        }
+
+        .sidebar-brand h1 {
+            font-size: 19px;
+        }
+
+        .sidebar-group-btn:hover,
+        .sidebar-module-link:hover,
+        .sidebar-module-link.active,
+        .sidebar-guide-link:hover {
+            background: #eef6f9;
+        }
+
+        .sidebar-group-btn[data-tone="category"] .sidebar-dot,
+        .sidebar-group-btn[data-tone="comparison"] .sidebar-dot {
+            background: #4f9fc3;
+        }
+
+        .sidebar-group-btn[data-tone="master"] .sidebar-dot,
+        .sidebar-group-btn[data-tone="imageev"] .sidebar-dot {
+            background: #ed8a2f;
+        }
+
+        .sidebar-group-btn[data-tone="removal"] .sidebar-dot {
+            background: #78a891;
+        }
+
+        .shell {
+            padding-top: 20px;
+        }
+
+        .hero {
+            min-height: 230px;
+            padding: 30px 34px;
+            border-radius: 28px;
+            border: 5px solid #fffaf0;
+            background: #dfeef3 url('Assets/5.png') center / cover no-repeat;
+            box-shadow: 0 16px 38px rgba(17, 70, 98, 0.13);
+            color: var(--text);
+            align-items: flex-end;
+        }
+
+        .hero::after {
+            display: none;
+        }
+
+        .hero-top {
+            max-width: 430px;
+            padding: 18px 22px;
+            border: 1px solid rgba(12, 72, 105, 0.16);
+            border-radius: 18px;
+            background: rgba(255, 251, 240, 0.92);
+            box-shadow: 7px 7px 0 rgba(237, 138, 47, 0.84);
+        }
+
+        .eyebrow {
+            background: #dceef5;
+            border-color: #acd1e1;
+            color: var(--accent-strong);
+        }
+
+        .hero h1 {
+            font-size: clamp(1.8rem, 3vw, 2.7rem);
+            color: #0a496e;
+            margin: 8px 0 4px;
+        }
+
+        .hero p {
+            color: var(--muted);
+            font-weight: 600;
+        }
+
+        .guide-accordion,
+        .module-group {
+            border: 1px solid #b7d5e2;
+            background: #fffdf7;
+            backdrop-filter: none;
+            box-shadow: var(--shadow);
+        }
+
+        .guide-accordion {
+            border-radius: 22px;
+        }
+
+        .guide-step,
+        .panel,
+        .toggle-row,
+        .mini-stat,
+        .config-row,
+        .action-lane,
+        .checklist-box {
+            background: #ffffff;
+            border-color: var(--line);
+        }
+
+        .guide-step {
+            border-radius: 16px;
+            border-top: 4px solid #8fc5db;
+        }
+
+        .module-groups {
+            gap: 20px;
+        }
+
+        .module-group {
+            padding: 20px;
+            border-radius: 24px;
+        }
+
+        .module-group::before {
+            inset: 14px 18px auto auto;
+            width: 112px;
+            height: 140px;
+            opacity: 1;
+            border: 4px solid #fffaf0;
+            border-radius: 16px;
+            background-size: cover;
+            background-position: center;
+            box-shadow: 5px 5px 0 #b8d9e7;
+        }
+
+        .module-group-header {
+            min-height: 142px;
+            padding: 14px 145px 16px 4px;
+            border-bottom: 2px solid #d9e9ef;
+        }
+
+        .module-group-heading {
+            align-items: flex-start;
+        }
+
+        .module-group-illustration {
+            display: none;
+        }
+
+        .module-group-heading h2 {
+            color: #0a496e;
+            font-size: 1.65rem;
+        }
+
+        .module-group-heading p {
+            max-width: 620px;
+        }
+
+        .module-group-count {
+            align-self: flex-start;
+            background: #e4f2f7;
+            color: #0a547c;
+            border: 1px solid #b9d9e6;
+        }
+
+        .module-group[data-group="category"]::before { background-image: url('Assets/6.png'); }
+        .module-group[data-group="master"]::before { background-image: url('Assets/7.png'); }
+        .module-group[data-group="comparison"]::before { background-image: url('Assets/9.png'); }
+        .module-group[data-group="removal"]::before { background-image: url('Assets/8.png'); }
+        .module-group[data-group="imageev"]::before { background-image: url('Assets/7.png'); }
+
+        .module-card {
+            border: 1px solid #c6dce5;
+            border-radius: 18px;
+            background: #ffffff;
+            backdrop-filter: none;
+            box-shadow: 0 6px 18px rgba(18, 72, 100, 0.06);
+        }
+
+        .module-card.expanded {
+            border-color: #7eb8d1;
+            box-shadow: 0 12px 26px rgba(18, 72, 100, 0.1);
+        }
+
+        .module-card::before,
+        .module-card::after {
+            display: none;
+        }
+
+        .module-card-header {
+            border-left: 5px solid #85bdd5;
+        }
+
+        .module-card-header:hover {
+            background: #f1f8fa;
+        }
+
+        .module-card:nth-child(even) .module-card-header {
+            border-left-color: #ed9a4b;
+        }
+
+        .module-tag {
+            color: #0b557e;
+            background: #e6f3f7;
+            border-color: #b9d9e6;
+        }
+
+        .feature-badge {
+            background: #f3f8f9;
+            border-color: #d5e5eb;
+        }
+
+        input[type="text"],
+        input[type="file"],
+        .selector-trigger,
+        .search-input,
+        .select-input {
+            background: #fffefa;
+            border-color: #b9d2dc;
+        }
+
+        input[type="file"]::file-selector-button,
+        .btn-primary,
+        .mobile-menu-btn {
+            background: #0e648f;
+        }
+
+        .btn {
+            border-radius: 10px;
+            background: #e8f1f4;
+        }
+
+        .btn:hover {
+            background: #dcebee;
+        }
+
+        .btn-primary:hover {
+            background: #08476c;
+        }
+
+        .btn-subtle {
+            background: #fbe7d3;
+            color: #8b4c16;
+        }
+
+        .status.loading,
+        .chip,
+        .module-collapse-icon,
+        .guide-step span {
+            background: #e3f1f6;
+        }
+
+        .preview {
+            background: #f7fbfc;
+            border-color: #c8dce4;
+        }
+
+        .preview-row {
+            background: #ffffff;
+            border-color: #d9e7ec;
+        }
+
+        footer {
+            color: #597382;
+        }
+
+        @media (max-width: 820px) {
+            .hero {
+                min-height: 200px;
+                background-position: 62% center;
+            }
+
+            .hero-top {
+                max-width: 82%;
+                padding: 14px 16px;
+            }
+
+            .module-group::before {
+                width: 78px;
+                height: 98px;
+            }
+
+            .module-group-header {
+                min-height: 104px;
+                padding-right: 96px;
+            }
+
+            .module-group-count {
+                display: none;
+            }
+        }
+
+        @media (max-width: 520px) {
+            body {
+                background-size: auto;
+            }
+
+            .hero {
+                min-height: 230px;
+                align-items: flex-end;
+                padding: 16px;
+                background-position: 70% center;
+            }
+
+            .hero-top {
+                max-width: 100%;
+                box-shadow: 4px 4px 0 rgba(237, 138, 47, 0.84);
+            }
+
+            .module-group::before {
+                display: none;
+            }
+
+            .module-group-header {
+                min-height: 0;
+                padding-right: 4px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1365,6 +1724,16 @@
             </button>
             <div class="sidebar-module-list">
                 <a class="sidebar-module-link" data-module="module-04b" onclick="openModule('module-04b')">Removal Suggestion</a>
+            </div>
+        </div>
+        <div class="sidebar-group">
+            <button class="sidebar-group-btn" data-tone="imageev" onclick="scrollToGroup('group-imageev')">
+                <span class="sidebar-dot"></span>
+                Image &amp; EV
+                <span class="sidebar-arrow">▼</span>
+            </button>
+            <div class="sidebar-module-list">
+                <a class="sidebar-module-link" data-module="module-07" onclick="openModule('module-07')">Image &amp; EV Clean Up</a>
             </div>
         </div>
         <button class="sidebar-guide-link" onclick="openGuideSection(event); closeMobileSidebar();">
@@ -1720,6 +2089,100 @@
                 </div>
             </article>
 
+            <article class="module-card" data-asset="2" data-group="imageev" id="module-07">
+                <div class="module-card-header" onclick="toggleModule('module-07')">
+                    <div class="module-card-header-left">
+                        <div class="module-tag">07</div>
+                        <h2 class="module-title">Image &amp; EV Clean Up</h2>
+                        <span class="module-card-header-copy">Monthly image rename, PIM cleanup, and blank EV export</span>
+                    </div>
+                    <div class="module-collapse-icon">▼</div>
+                </div>
+                <div class="module-card-body">
+                <div class="module-inner">
+                    <div class="feature-list">
+                        <div class="feature-badge">Whole-folder image upload</div>
+                        <div class="feature-badge">Fixed-client EV source cleanup</div>
+                        <div class="feature-badge">Dynamic blank EV finder</div>
+                    </div>
+                    <div class="panel">
+                        <div class="subsection">
+                            <div class="subsection-title">Bulk Rename Images</div>
+                            <div class="subsection-copy">Select the complete parent image folder. Files inside supported visual folders are renamed with the configured suffix mapping.</div>
+                            <div class="field-full">
+                                <label for="imageEvFolderInput">Image parent folder</label>
+                                <input type="file" id="imageEvFolderInput" webkitdirectory directory multiple>
+                            </div>
+                            <div class="actions">
+                                <button class="btn btn-primary" type="button" onclick="downloadRenamedImages()">Rename and Download</button>
+                                <button class="btn" type="button" onclick="resetImageRename()">Reset</button>
+                            </div>
+                            <div id="statusImageRename" class="status"></div>
+                            <div id="previewImageRename" class="preview"></div>
+                        </div>
+
+                        <div class="subsection">
+                            <div class="subsection-title">EV Cleanup</div>
+                            <div class="subsection-copy">Clean the fixed client's PIM source into the backend-ready eight-column EV source format. The exported sheet is named <strong>Master Lookup</strong>.</div>
+                            <div class="field-full">
+                                <label for="fixedEvCleanupFile">Client PIM workbook</label>
+                                <input type="file" id="fixedEvCleanupFile" accept=".xlsx,.xls,.csv">
+                            </div>
+                            <div class="actions">
+                                <button class="btn btn-primary" type="button" onclick="processFixedEvCleanup()">Clean and Export</button>
+                                <button class="btn" type="button" onclick="previewFixedEvCleanup()">Preview</button>
+                            </div>
+                            <div id="statusFixedEvCleanup" class="status"></div>
+                            <div id="previewFixedEvCleanup" class="preview"></div>
+                        </div>
+
+                        <div class="subsection">
+                            <div class="subsection-title">Find Blank EV</div>
+                            <div class="subsection-copy">Upload the requirement workbook. EV fields are read from the <strong>EV export</strong> sheet; the <code>ev_</code> prefix is removed only in the dropdown label. The original header is preserved in the exported update file.</div>
+                            <div class="field-grid">
+                                <div class="field-full">
+                                    <label for="blankEvRequirementFile">Requirement workbook</label>
+                                    <input type="file" id="blankEvRequirementFile" accept=".xlsx,.xls">
+                                </div>
+                                <div class="field">
+                                    <label for="blankEvFieldSelect">EV field</label>
+                                    <select class="select-input" id="blankEvFieldSelect" onchange="updateBlankEvSelection()">
+                                        <option value="">Upload requirement workbook first</option>
+                                    </select>
+                                </div>
+                                <div class="field">
+                                    <label for="blankEvSourceSelect">Value source from Product List</label>
+                                    <select class="select-input" id="blankEvSourceSelect" onchange="updateBlankEvSourceSelection()">
+                                        <option value="">Auto-match after EV field selection</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="mini-stats">
+                                <div class="mini-stat">
+                                    <strong id="blankEvFieldCount">0</strong>
+                                    <span>EV fields detected</span>
+                                </div>
+                                <div class="mini-stat">
+                                    <strong id="blankEvProductCount">0</strong>
+                                    <span>eligible client products</span>
+                                </div>
+                                <div class="mini-stat">
+                                    <strong id="blankEvMatchedCount">0</strong>
+                                    <span>blank EV rows found</span>
+                                </div>
+                            </div>
+                            <div class="actions">
+                                <button class="btn btn-primary" type="button" onclick="processBlankEvExport()">Find Blank EV and Export</button>
+                                <button class="btn" type="button" onclick="previewBlankEvExport()">Preview</button>
+                            </div>
+                            <div id="statusBlankEv" class="status"></div>
+                            <div id="previewBlankEv" class="preview"></div>
+                        </div>
+                    </div>
+                </div>
+                </div>
+            </article>
+
             <article class="module-card" data-asset="1" data-group="comparison" id="module-05">
                 <div class="module-card-header" onclick="toggleModule('module-05')">
                     <div class="module-card-header-left">
@@ -2009,12 +2472,50 @@
             },
             lastResult: null
         };
+        const FIXED_EV_COLUMNS = [
+            'Profitero URL',
+            'element_1_page_product_id',
+            'element_2_page_product_id',
+            'element_3_page_product_id',
+            'size_with_unit',
+            'how to use',
+            'description',
+            'EANCode'
+        ];
+        const IMAGE_RENAME_MAPPING = {
+            SKUS_FULL: 'main',
+            ALTERNATIVE_VISUAL_1: 'secondary1',
+            ALTERNATIVE_VISUAL_2: 'secondary2',
+            APPLICATION_VISUAL_C: 'secondary3',
+            APPLICATION_VISUAL_A: 'secondary4',
+            APPLICATION_VISUAL_B: 'secondary5',
+            APPLICATION_VISUAL_1: 'secondary6',
+            APPLICATION_VISUAL_2: 'secondary7',
+            TEXTURE_VISUAL: 'secondary8',
+            SWATCH_VISUAL: 'swatch'
+        };
+        const blankEvState = {
+            workbook: null,
+            fileName: '',
+            productHeaders: [],
+            productRows: [],
+            evHeaders: [],
+            evRows: [],
+            evFields: [],
+            productColumns: {},
+            evColumns: {},
+            selectedEvHeader: '',
+            selectedSourceHeader: '',
+            lastResult: null
+        };
 
         document.getElementById('categoryFilterFile').addEventListener('change', initializeCategoryFilterState);
         document.getElementById('comparisonMasterFile').addEventListener('change', initializeComparisonState);
         document.getElementById('comparisonClientFile').addEventListener('change', initializeComparisonState);
         document.getElementById('qaSourceFile').addEventListener('change', initializeQAState);
         document.getElementById('qaLatestFile').addEventListener('change', initializeQAState);
+        document.getElementById('imageEvFolderInput').addEventListener('change', previewRenamedImages);
+        document.getElementById('blankEvRequirementFile').addEventListener('change', initializeBlankEvState);
         document.getElementById('categorySelectorTrigger').addEventListener('click', toggleCategorySelector);
         document.getElementById('categorySearch').addEventListener('input', renderCategoryOptions);
         document.addEventListener('click', handleOutsideClick);
@@ -2119,6 +2620,11 @@
                     key: 'removal',
                     title: 'Removal Suggestion',
                     copy: 'Generate a marked clean master list and a focused removal sheet for internal handling.',
+                },
+                {
+                    key: 'imageev',
+                    title: 'Image & EV Clean Up',
+                    copy: 'Monthly image rename, client PIM cleanup, and requirement-based blank EV preparation.',
                 }
             ];
 
@@ -4809,6 +5315,360 @@
                 );
             } catch (error) {
                 showPreview(preview, `<div class="preview-title">Preview error</div><div class="preview-row">${escapeHtml(error.message)}</div>`);
+            }
+        }
+
+        function normalizeLooseHeader(value) {
+            return String(value ?? '').trim().toLowerCase().replace(/[\s_-]+/g, '');
+        }
+
+        function findMatrixHeaderRow(matrix, expectedHeaders) {
+            const signals = expectedHeaders.map(normalizeLooseHeader);
+            let bestIndex = 0;
+            let bestScore = -1;
+            matrix.slice(0, 30).forEach((row, index) => {
+                const normalized = row.map(normalizeLooseHeader);
+                const score = signals.filter((signal) => normalized.includes(signal)).length;
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestIndex = index;
+                }
+            });
+            return bestIndex;
+        }
+
+        function cleanFixedEvText(value) {
+            return String(value ?? '')
+                .replace(/<\s*br\s*\/?>|<\s*\/\s*br\s*>|<\s*u\s*\/?>|<\s*\/\s*u\s*>/gi, '')
+                .trim();
+        }
+
+        async function buildFixedEvCleanupResult() {
+            const workbook = await readWorkbookFromInput(document.getElementById('fixedEvCleanupFile'));
+            const sheetName = workbook.SheetNames[0];
+            if (!sheetName) throw new Error('The selected workbook does not contain a sheet');
+            const matrix = getWorksheetMatrix(workbook.Sheets[sheetName]);
+            if (!matrix.length) throw new Error('The selected workbook is empty');
+
+            const headerRowIndex = findMatrixHeaderRow(matrix, FIXED_EV_COLUMNS);
+            const sourceHeaders = matrix[headerRowIndex] || [];
+            const normalizedHeaders = sourceHeaders.map(normalizeLooseHeader);
+            const columnIndexes = FIXED_EV_COLUMNS.map((header) => {
+                const normalized = normalizeLooseHeader(header);
+                let index = normalizedHeaders.indexOf(normalized);
+                if (index === -1 && header === 'Profitero URL') {
+                    index = normalizedHeaders.findIndex((item) => item.includes('profiterourl') || item === 'url');
+                }
+                if (index === -1 && header === 'EANCode') {
+                    index = normalizedHeaders.findIndex((item) => ['eancode', 'ean', 'eanupc', 'upcean', 'upc'].includes(item));
+                }
+                return index;
+            });
+            const rows = matrix.slice(headerRowIndex + 1)
+                .filter((row) => row.some((cell) => !isEmptyCell(cell)))
+                .map((row) => FIXED_EV_COLUMNS.map((header, index) => {
+                    const sourceIndex = columnIndexes[index];
+                    const value = sourceIndex >= 0 ? row[sourceIndex] : '';
+                    return header === 'how to use' || header === 'description' ? cleanFixedEvText(value) : (value ?? '');
+                }));
+            const missingHeaders = FIXED_EV_COLUMNS.filter((_header, index) => columnIndexes[index] < 0);
+            return { sheetName, rows, missingHeaders };
+        }
+
+        async function previewFixedEvCleanup() {
+            const preview = document.getElementById('previewFixedEvCleanup');
+            try {
+                const result = await buildFixedEvCleanupResult();
+                const samples = result.rows.slice(0, 5).map((row, index) => `
+                    <div class="preview-row"><strong>Row ${index + 1}</strong><br>${escapeHtml(FIXED_EV_COLUMNS.map((header, colIndex) => `${header}: ${row[colIndex] ?? ''}`).join(' | '))}</div>
+                `).join('');
+                showPreview(
+                    preview,
+                    `<div class="preview-title">EV cleanup preview</div>
+                     <div class="preview-row">Source sheet: ${escapeHtml(result.sheetName)} | Rows: ${result.rows.length}<br>Missing columns filled as blank: ${escapeHtml(result.missingHeaders.join(', ') || 'None')}</div>
+                     ${samples || '<div class="preview-row">No data rows were detected.</div>'}`
+                );
+            } catch (error) {
+                showPreview(preview, `<div class="preview-title">Preview error</div><div class="preview-row">${escapeHtml(error.message)}</div>`);
+            }
+        }
+
+        async function processFixedEvCleanup() {
+            const status = document.getElementById('statusFixedEvCleanup');
+            try {
+                showStatus(status, 'Cleaning the client PIM workbook...', 'loading');
+                const result = await buildFixedEvCleanupResult();
+                const matrix = [FIXED_EV_COLUMNS, ...result.rows];
+                const worksheet = XLSX.utils.aoa_to_sheet(matrix);
+                applySheetStyles(worksheet, matrix);
+                const workbook = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(workbook, worksheet, 'Master Lookup');
+                const file = document.getElementById('fixedEvCleanupFile').files[0];
+                const baseName = file ? file.name.replace(/\.[^.]+$/, '') : 'EV_source';
+                XLSX.writeFile(workbook, `${baseName}_cleaned.xlsx`);
+                showStatus(status, `Export complete. ${result.rows.length} rows were written.${result.missingHeaders.length ? ` Missing columns were filled as blank: ${escapeHtml(result.missingHeaders.join(', '))}.` : ''}`, 'success');
+            } catch (error) {
+                showStatus(status, `Error: ${escapeHtml(error.message)}`, 'error');
+            }
+        }
+
+        function getImageRenameInfo(file) {
+            const relativePath = file.webkitRelativePath || file.name;
+            const parts = relativePath.split('/').filter(Boolean);
+            const folder = parts.length >= 2 ? parts[parts.length - 2] : '';
+            const suffix = IMAGE_RENAME_MAPPING[folder];
+            if (!suffix) return { file, folder, newName: '', matched: false };
+            const dotIndex = file.name.lastIndexOf('.');
+            const baseName = dotIndex > -1 ? file.name.slice(0, dotIndex) : file.name;
+            const extension = dotIndex > -1 ? file.name.slice(dotIndex) : '';
+            return { file, folder, newName: `${baseName}_${suffix}${extension}`, matched: true };
+        }
+
+        function getImageRenameItems() {
+            return Array.from(document.getElementById('imageEvFolderInput').files || []).map(getImageRenameInfo);
+        }
+
+        function previewRenamedImages() {
+            const preview = document.getElementById('previewImageRename');
+            const status = document.getElementById('statusImageRename');
+            const items = getImageRenameItems();
+            if (!items.length) {
+                hidePreview(preview);
+                return;
+            }
+            const matched = items.filter((item) => item.matched);
+            const sample = items.slice(0, 50).map((item) => `
+                <div class="preview-row">
+                    <strong>${escapeHtml(item.file.name)}</strong><br>
+                    Folder: ${escapeHtml(item.folder || 'No parent folder')}<br>
+                    ${item.matched ? `New name: ${escapeHtml(item.newName)}` : 'Skipped: unsupported folder'}
+                </div>
+            `).join('');
+            showPreview(preview, `<div class="preview-title">Image rename preview</div><div class="preview-row">${items.length} files loaded | ${matched.length} matched | ${items.length - matched.length} skipped</div>${sample}`);
+            showStatus(status, `${matched.length} of ${items.length} files match the configured folder mapping.`, matched.length ? 'success' : 'error');
+        }
+
+        async function downloadRenamedImages() {
+            const status = document.getElementById('statusImageRename');
+            try {
+                const matched = getImageRenameItems().filter((item) => item.matched);
+                if (!matched.length) throw new Error('Select a parent folder containing supported visual folders first');
+                if (typeof JSZip === 'undefined') throw new Error('ZIP library failed to load. Check the network connection and reload the page');
+                showStatus(status, `Building ZIP with ${matched.length} renamed images...`, 'loading');
+                const zip = new JSZip();
+                matched.forEach((item) => zip.file(item.newName, item.file));
+                const blob = await zip.generateAsync({ type: 'blob' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'renamed_images.zip';
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+                showStatus(status, `Export complete. ${matched.length} renamed images were written to renamed_images.zip.`, 'success');
+            } catch (error) {
+                showStatus(status, `Error: ${escapeHtml(error.message)}`, 'error');
+            }
+        }
+
+        function resetImageRename() {
+            document.getElementById('imageEvFolderInput').value = '';
+            hidePreview(document.getElementById('previewImageRename'));
+            document.getElementById('statusImageRename').className = 'status';
+        }
+
+        function getEvDropdownLabel(header) {
+            return String(header).replace(/^(?:ev|ex)_/i, '');
+        }
+
+        function findHeaderByAliases(headers, aliases) {
+            const normalizedAliases = aliases.map(normalizeLooseHeader);
+            return headers.find((header) => normalizedAliases.includes(normalizeLooseHeader(header))) || '';
+        }
+
+        function getPreferredBlankEvSource(evHeader, productHeaders) {
+            const label = getEvDropdownLabel(evHeader);
+            const normalizedLabel = normalizeLooseHeader(label)
+                .replace(/^expected/, '')
+                .replace(/\d+$/, '');
+            const exact = productHeaders.find((header) => normalizeLooseHeader(header) === normalizedLabel);
+            if (exact) return exact;
+            if (normalizedLabel.includes('brandname') || normalizedLabel === 'brand') {
+                return findHeaderByAliases(productHeaders, ['Brand', 'Brand Name']);
+            }
+            return productHeaders.find((header) => {
+                const normalizedHeader = normalizeLooseHeader(header);
+                return normalizedHeader && (normalizedLabel.includes(normalizedHeader) || normalizedHeader.includes(normalizedLabel));
+            }) || '';
+        }
+
+        function renderBlankEvControls() {
+            const evSelect = document.getElementById('blankEvFieldSelect');
+            const sourceSelect = document.getElementById('blankEvSourceSelect');
+            evSelect.innerHTML = buildSelectOptions(
+                blankEvState.evFields.map((header) => ({ value: header, label: getEvDropdownLabel(header) })),
+                blankEvState.selectedEvHeader,
+                blankEvState.evFields.length ? 'Choose an EV field' : 'No ev_ fields detected'
+            );
+            sourceSelect.innerHTML = buildSelectOptions(
+                blankEvState.productHeaders,
+                blankEvState.selectedSourceHeader,
+                'Leave blank to export empty values'
+            );
+            document.getElementById('blankEvFieldCount').textContent = String(blankEvState.evFields.length);
+            document.getElementById('blankEvProductCount').textContent = String(blankEvState.productRows.length);
+            document.getElementById('blankEvMatchedCount').textContent = String(blankEvState.lastResult?.rows.length || 0);
+        }
+
+        async function initializeBlankEvState() {
+            const status = document.getElementById('statusBlankEv');
+            const input = document.getElementById('blankEvRequirementFile');
+            blankEvState.lastResult = null;
+            hidePreview(document.getElementById('previewBlankEv'));
+            if (!input.files.length) return;
+
+            try {
+                showStatus(status, 'Reading Product List and EV export sheets...', 'loading');
+                const workbook = await readWorkbookFromInput(input);
+                const productSheetName = findOptionalSheetName(workbook, ['ds360 product list', 'product list']);
+                const evSheetName = findOptionalSheetName(workbook, ['ev export', 'expected value']);
+                if (!productSheetName) throw new Error('DS360 Product List sheet was not found');
+                if (!evSheetName) throw new Error('EV export sheet was not found');
+
+                const productProcessed = processWorksheetData(workbook.Sheets[productSheetName], COLUMNS_TO_DROP);
+                const ownerFiltered = filterRowsByOwnerClient(productProcessed.data, productProcessed.headers, true);
+                const productRows = filterRowsWithContent(ownerFiltered, productProcessed.headers);
+                const evMatrix = getWorksheetMatrix(workbook.Sheets[evSheetName]).filter((row) => row.some((cell) => !isEmptyCell(cell)));
+                if (evMatrix.length < 2) throw new Error('EV export sheet does not contain data rows');
+                const evHeaders = makeUniqueHeaders(evMatrix[0]);
+                const evRows = evMatrix.slice(1);
+                const evFields = evHeaders.filter((header) => /^(?:ev|ex)_/i.test(String(header).trim()));
+                if (!evFields.length) throw new Error('No headers beginning with ev_ were found in EV export');
+
+                blankEvState.workbook = workbook;
+                blankEvState.fileName = input.files[0].name;
+                blankEvState.productHeaders = productProcessed.headers;
+                blankEvState.productRows = productRows;
+                blankEvState.evHeaders = evHeaders;
+                blankEvState.evRows = evRows;
+                blankEvState.evFields = evFields;
+                blankEvState.productColumns = {
+                    id: findHeaderByAliases(productProcessed.headers, ['Profitero ID', 'Product ID']),
+                    url: findHeaderByAliases(productProcessed.headers, ['Profitero URL', 'Product URL', 'Product Fake URL']),
+                    name: findHeaderByAliases(productProcessed.headers, ['Profitero Product Name', 'Product Name'])
+                };
+                blankEvState.evColumns = {
+                    id: findHeaderByAliases(evHeaders, ['Product ID', 'Profitero ID']),
+                    url: findHeaderByAliases(evHeaders, ['Product Fake URL', 'Product URL', 'Profitero URL']),
+                    name: findHeaderByAliases(evHeaders, ['Product Name', 'Profitero Product Name'])
+                };
+                if (!blankEvState.productColumns.id || !blankEvState.evColumns.id) {
+                    throw new Error('A Product ID / Profitero ID column is required in both sheets');
+                }
+
+                blankEvState.selectedEvHeader = evFields[0];
+                blankEvState.selectedSourceHeader = getPreferredBlankEvSource(evFields[0], productProcessed.headers);
+                renderBlankEvControls();
+                showStatus(status, `${evFields.length} EV fields loaded from ${escapeHtml(evSheetName)}. Choose a field and preview the blank rows.`, 'success');
+            } catch (error) {
+                blankEvState.workbook = null;
+                blankEvState.evFields = [];
+                blankEvState.productRows = [];
+                renderBlankEvControls();
+                showStatus(status, `Error: ${escapeHtml(error.message)}`, 'error');
+            }
+        }
+
+        function updateBlankEvSelection() {
+            blankEvState.selectedEvHeader = document.getElementById('blankEvFieldSelect').value;
+            blankEvState.selectedSourceHeader = getPreferredBlankEvSource(blankEvState.selectedEvHeader, blankEvState.productHeaders);
+            blankEvState.lastResult = null;
+            renderBlankEvControls();
+        }
+
+        function updateBlankEvSourceSelection() {
+            blankEvState.selectedSourceHeader = document.getElementById('blankEvSourceSelect').value;
+            blankEvState.lastResult = null;
+        }
+
+        function buildBlankEvResult() {
+            if (!blankEvState.workbook) throw new Error('Upload a valid requirement workbook first');
+            const selectedEvHeader = blankEvState.selectedEvHeader;
+            if (!selectedEvHeader) throw new Error('Choose an EV field');
+
+            const evIdIndex = blankEvState.evHeaders.indexOf(blankEvState.evColumns.id);
+            const selectedEvIndex = blankEvState.evHeaders.indexOf(selectedEvHeader);
+            const evUrlIndex = blankEvState.evHeaders.indexOf(blankEvState.evColumns.url);
+            const evNameIndex = blankEvState.evHeaders.indexOf(blankEvState.evColumns.name);
+            const evById = new Map();
+            blankEvState.evRows.forEach((row) => {
+                const id = String(row[evIdIndex] ?? '').trim();
+                if (id && !evById.has(id)) evById.set(id, row);
+            });
+
+            let notInEvCount = 0;
+            let blankSourceCount = 0;
+            const rows = [];
+            blankEvState.productRows.forEach((productRow) => {
+                const productId = String(productRow[blankEvState.productColumns.id] ?? '').trim();
+                if (!productId) return;
+                const evRow = evById.get(productId);
+                if (!evRow) {
+                    notInEvCount += 1;
+                    return;
+                }
+                if (!isEmptyCell(evRow[selectedEvIndex])) return;
+                const sourceValue = blankEvState.selectedSourceHeader ? productRow[blankEvState.selectedSourceHeader] ?? '' : '';
+                if (isEmptyCell(sourceValue)) blankSourceCount += 1;
+                rows.push([
+                    productId,
+                    productRow[blankEvState.productColumns.url] || evRow[evUrlIndex] || '',
+                    productRow[blankEvState.productColumns.name] || evRow[evNameIndex] || '',
+                    sourceValue
+                ]);
+            });
+            const headers = ['Product ID', 'Product Fake URL', 'Product Name', selectedEvHeader];
+            return { headers, rows, notInEvCount, blankSourceCount };
+        }
+
+        async function previewBlankEvExport() {
+            const preview = document.getElementById('previewBlankEv');
+            try {
+                const result = buildBlankEvResult();
+                blankEvState.lastResult = result;
+                document.getElementById('blankEvMatchedCount').textContent = String(result.rows.length);
+                const samples = result.rows.slice(0, 20).map((row, index) => `
+                    <div class="preview-row"><strong>Row ${index + 1}</strong><br>${escapeHtml(result.headers.map((header, colIndex) => `${header}: ${row[colIndex] ?? ''}`).join(' | '))}</div>
+                `).join('');
+                showPreview(
+                    preview,
+                    `<div class="preview-title">Blank EV preview: ${escapeHtml(getEvDropdownLabel(blankEvState.selectedEvHeader))}</div>
+                     <div class="preview-row">${result.rows.length} blank rows found | ${result.notInEvCount} Product List rows not found in EV export | ${result.blankSourceCount} output values are blank<br>Source column: ${escapeHtml(blankEvState.selectedSourceHeader || 'None')}</div>
+                     ${samples || '<div class="preview-row">No blank EV rows were found for this field.</div>'}`
+                );
+            } catch (error) {
+                showPreview(preview, `<div class="preview-title">Preview error</div><div class="preview-row">${escapeHtml(error.message)}</div>`);
+            }
+        }
+
+        async function processBlankEvExport() {
+            const status = document.getElementById('statusBlankEv');
+            try {
+                showStatus(status, 'Finding blank EV rows and building the update workbook...', 'loading');
+                const result = buildBlankEvResult();
+                blankEvState.lastResult = result;
+                document.getElementById('blankEvMatchedCount').textContent = String(result.rows.length);
+                const matrix = [result.headers, ...result.rows];
+                const worksheet = XLSX.utils.aoa_to_sheet(matrix);
+                applySheetStyles(worksheet, matrix);
+                const workbook = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(workbook, worksheet, 'Blank EV Update');
+                const fieldName = sanitizeFileName(getEvDropdownLabel(blankEvState.selectedEvHeader), 'ev');
+                XLSX.writeFile(workbook, `blank_${fieldName}_update.xlsx`);
+                showStatus(status, `Export complete. ${result.rows.length} blank EV rows were written.${result.blankSourceCount ? ` ${result.blankSourceCount} rows have no value in the selected source column.` : ''}`, 'success');
+            } catch (error) {
+                showStatus(status, `Error: ${escapeHtml(error.message)}`, 'error');
             }
         }
 
