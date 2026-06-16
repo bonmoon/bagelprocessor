@@ -1406,7 +1406,7 @@
             padding: 30px 34px;
             border-radius: 28px;
             border: 5px solid #fffaf0;
-            background: #dfeef3 url('Assets/5.png') center / cover no-repeat;
+            background: #dfeef3 url('Assets/9.png') center / cover no-repeat;
             box-shadow: 0 16px 38px rgba(17, 70, 98, 0.13);
             color: var(--text);
             align-items: flex-end;
@@ -1523,7 +1523,7 @@
 
         .module-group[data-group="category"]::before { background-image: url('Assets/6.png'); }
         .module-group[data-group="master"]::before { background-image: url('Assets/7.png'); }
-        .module-group[data-group="comparison"]::before { background-image: url('Assets/9.png'); }
+        .module-group[data-group="comparison"]::before { background-image: url('Assets/6.png'); }
         .module-group[data-group="removal"]::before { background-image: url('Assets/8.png'); }
         .module-group[data-group="imageev"]::before { background-image: url('Assets/7.png'); }
 
@@ -2483,16 +2483,16 @@
             'EANCode'
         ];
         const IMAGE_RENAME_MAPPING = {
-            SKUS_FULL: 'main',
-            ALTERNATIVE_VISUAL_1: 'secondary1',
-            ALTERNATIVE_VISUAL_2: 'secondary2',
-            APPLICATION_VISUAL_C: 'secondary3',
-            APPLICATION_VISUAL_A: 'secondary4',
-            APPLICATION_VISUAL_B: 'secondary5',
-            APPLICATION_VISUAL_1: 'secondary6',
-            APPLICATION_VISUAL_2: 'secondary7',
-            TEXTURE_VISUAL: 'secondary8',
-            SWATCH_VISUAL: 'swatch'
+            SKUS_FULL: { suffix: 'main', outputFolder: 'Chanel AU EV Hero images' },
+            ALTERNATIVE_VISUAL_1: { suffix: 'secondary1', outputFolder: 'Chanel AU EV image no 2' },
+            ALTERNATIVE_VISUAL_2: { suffix: 'secondary2', outputFolder: 'Chanel AU EV image no 3' },
+            APPLICATION_VISUAL_C: { suffix: 'secondary3', outputFolder: 'Chanel AU EV image no 4' },
+            APPLICATION_VISUAL_A: { suffix: 'secondary4', outputFolder: 'Chanel AU EV image no 5' },
+            APPLICATION_VISUAL_B: { suffix: 'secondary5', outputFolder: 'Chanel AU EV image no 6' },
+            APPLICATION_VISUAL_1: { suffix: 'secondary6', outputFolder: 'Chanel AU EV image no 7' },
+            APPLICATION_VISUAL_2: { suffix: 'secondary7', outputFolder: 'Chanel AU EV image no 8' },
+            TEXTURE_VISUAL: { suffix: 'secondary8', outputFolder: 'Chanel AU EV image no 9' },
+            SWATCH_VISUAL: { suffix: 'swatch', outputFolder: 'Chanel AV EV Swatch image' }
         };
         const blankEvState = {
             workbook: null,
@@ -5339,8 +5339,29 @@
 
         function cleanFixedEvText(value) {
             return String(value ?? '')
-                .replace(/<\s*br\s*\/?>|<\s*\/\s*br\s*>|<\s*u\s*\/?>|<\s*\/\s*u\s*>/gi, '')
+                .replace(/<\s*br\s*\/?>|<\s*\/\s*br\s*>/gi, ' ')
+                .replace(/<[^>]*>/g, '')
+                .replace(/&nbsp;/gi, ' ')
+                .replace(/&amp;/gi, '&')
+                .replace(/&lt;/gi, '<')
+                .replace(/&gt;/gi, '>')
+                .replace(/&quot;/gi, '"')
+                .replace(/&#39;/gi, "'")
+                .replace(/\s+/g, ' ')
                 .trim();
+        }
+
+        function findNormalizedColumnIndex(normalizedHeaders, aliases) {
+            const normalizedAliases = aliases.map(normalizeLooseHeader);
+            return normalizedHeaders.findIndex((header) => normalizedAliases.includes(header));
+        }
+
+        function combineSizeWithUnit(row, normalizedHeaders) {
+            const sizeIndex = findNormalizedColumnIndex(normalizedHeaders, ['size']);
+            const unitIndex = findNormalizedColumnIndex(normalizedHeaders, ['sizeunit', 'size unit', 'unit']);
+            const size = sizeIndex >= 0 ? cleanFixedEvText(row[sizeIndex]) : '';
+            const unit = unitIndex >= 0 ? cleanFixedEvText(row[unitIndex]) : '';
+            return [size, unit].filter(Boolean).join(' ').trim();
         }
 
         async function buildFixedEvCleanupResult() {
@@ -5368,8 +5389,11 @@
                 .filter((row) => row.some((cell) => !isEmptyCell(cell)))
                 .map((row) => FIXED_EV_COLUMNS.map((header, index) => {
                     const sourceIndex = columnIndexes[index];
-                    const value = sourceIndex >= 0 ? row[sourceIndex] : '';
-                    return header === 'how to use' || header === 'description' ? cleanFixedEvText(value) : (value ?? '');
+                    let value = sourceIndex >= 0 ? row[sourceIndex] : '';
+                    if (header === 'size_with_unit' && isEmptyCell(value)) {
+                        value = combineSizeWithUnit(row, normalizedHeaders);
+                    }
+                    return cleanFixedEvText(value);
                 }));
             const missingHeaders = FIXED_EV_COLUMNS.filter((_header, index) => columnIndexes[index] < 0);
             return { sheetName, rows, missingHeaders };
@@ -5416,12 +5440,18 @@
             const relativePath = file.webkitRelativePath || file.name;
             const parts = relativePath.split('/').filter(Boolean);
             const folder = parts.length >= 2 ? parts[parts.length - 2] : '';
-            const suffix = IMAGE_RENAME_MAPPING[folder];
-            if (!suffix) return { file, folder, newName: '', matched: false };
+            const mapping = IMAGE_RENAME_MAPPING[folder];
+            if (!mapping) return { file, folder, outputFolder: '', newName: '', matched: false };
             const dotIndex = file.name.lastIndexOf('.');
             const baseName = dotIndex > -1 ? file.name.slice(0, dotIndex) : file.name;
             const extension = dotIndex > -1 ? file.name.slice(dotIndex) : '';
-            return { file, folder, newName: `${baseName}_${suffix}${extension}`, matched: true };
+            return {
+                file,
+                folder,
+                outputFolder: mapping.outputFolder,
+                newName: `${baseName}_${mapping.suffix}${extension}`,
+                matched: true
+            };
         }
 
         function getImageRenameItems() {
@@ -5441,7 +5471,7 @@
                 <div class="preview-row">
                     <strong>${escapeHtml(item.file.name)}</strong><br>
                     Folder: ${escapeHtml(item.folder || 'No parent folder')}<br>
-                    ${item.matched ? `New name: ${escapeHtml(item.newName)}` : 'Skipped: unsupported folder'}
+                    ${item.matched ? `Output folder: ${escapeHtml(item.outputFolder)}<br>New name: ${escapeHtml(item.newName)}` : 'Skipped: unsupported folder'}
                 </div>
             `).join('');
             showPreview(preview, `<div class="preview-title">Image rename preview</div><div class="preview-row">${items.length} files loaded | ${matched.length} matched | ${items.length - matched.length} skipped</div>${sample}`);
@@ -5456,7 +5486,7 @@
                 if (typeof JSZip === 'undefined') throw new Error('ZIP library failed to load. Check the network connection and reload the page');
                 showStatus(status, `Building ZIP with ${matched.length} renamed images...`, 'loading');
                 const zip = new JSZip();
-                matched.forEach((item) => zip.file(item.newName, item.file));
+                matched.forEach((item) => zip.file(`${item.outputFolder}/${item.newName}`, item.file));
                 const blob = await zip.generateAsync({ type: 'blob' });
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement('a');
