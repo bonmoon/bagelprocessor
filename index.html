@@ -2494,6 +2494,7 @@
             TEXTURE_VISUAL: { suffix: 'secondary8', outputFolder: 'Chanel AU EV image no 9' },
             SWATCH_VISUAL: { suffix: 'swatch', outputFolder: 'Chanel AV EV Swatch image' }
         };
+        const IMAGE_REVIEW_FOLDER = 'Needs manual review';
         const blankEvState = {
             workbook: null,
             fileName: '',
@@ -5458,6 +5459,43 @@
             return Array.from(document.getElementById('imageEvFolderInput').files || []).map(getImageRenameInfo);
         }
 
+        function getManualReviewPath(item, index) {
+            const safeFolder = sanitizeFileName(item.folder || 'unknown_folder', 'unknown_folder');
+            const safeName = item.file.name || `image_${index + 1}`;
+            return `${IMAGE_REVIEW_FOLDER}/${safeFolder}/${safeName}`;
+        }
+
+        function renderImageRenameSummary(items, processed = false) {
+            const matched = items.filter((item) => item.matched);
+            const skipped = items.filter((item) => !item.matched);
+            const sample = items.slice(0, 50).map((item, index) => `
+                <div class="preview-row">
+                    <strong>${escapeHtml(item.file.name)}</strong><br>
+                    Folder: ${escapeHtml(item.folder || 'No parent folder')}<br>
+                    ${item.matched
+                        ? `Output folder: ${escapeHtml(item.outputFolder)}<br>New name: ${escapeHtml(item.newName)}`
+                        : `Needs manual review<br>ZIP path: ${escapeHtml(getManualReviewPath(item, index))}`}
+                </div>
+            `).join('');
+            const skippedRows = skipped.length
+                ? `<div class="preview-title" style="margin-top: 14px;">Manual review needed (${skipped.length})</div>
+                   ${skipped.slice(0, 80).map((item, index) => `
+                    <div class="preview-row">
+                        <strong>${escapeHtml(item.file.name)}</strong><br>
+                        Source folder: ${escapeHtml(item.folder || 'No parent folder')}<br>
+                        Reason: parent folder is not in the configured mapping.
+                    </div>
+                   `).join('')}`
+                : '';
+            return {
+                matched,
+                skipped,
+                html: `<div class="preview-title">${processed ? 'Image rename export summary' : 'Image rename preview'}</div>
+                       <div class="preview-row">${items.length} files loaded | ${matched.length} matched | ${skipped.length} need manual review${skipped.length ? `<br>Unmatched files will be placed in <strong>${escapeHtml(IMAGE_REVIEW_FOLDER)}</strong> inside the ZIP.` : ''}</div>
+                       ${sample}${skippedRows}`
+            };
+        }
+
         function previewRenamedImages() {
             const preview = document.getElementById('previewImageRename');
             const status = document.getElementById('statusImageRename');
@@ -5466,27 +5504,27 @@
                 hidePreview(preview);
                 return;
             }
-            const matched = items.filter((item) => item.matched);
-            const sample = items.slice(0, 50).map((item) => `
-                <div class="preview-row">
-                    <strong>${escapeHtml(item.file.name)}</strong><br>
-                    Folder: ${escapeHtml(item.folder || 'No parent folder')}<br>
-                    ${item.matched ? `Output folder: ${escapeHtml(item.outputFolder)}<br>New name: ${escapeHtml(item.newName)}` : 'Skipped: unsupported folder'}
-                </div>
-            `).join('');
-            showPreview(preview, `<div class="preview-title">Image rename preview</div><div class="preview-row">${items.length} files loaded | ${matched.length} matched | ${items.length - matched.length} skipped</div>${sample}`);
-            showStatus(status, `${matched.length} of ${items.length} files match the configured folder mapping.`, matched.length ? 'success' : 'error');
+            const summary = renderImageRenameSummary(items);
+            showPreview(preview, summary.html);
+            showStatus(
+                status,
+                `${summary.matched.length} of ${items.length} files match the configured folder mapping.${summary.skipped.length ? ` ${summary.skipped.length} file(s) will be copied into ${escapeHtml(IMAGE_REVIEW_FOLDER)} for manual review.` : ''}`,
+                summary.matched.length ? 'success' : 'error'
+            );
         }
 
         async function downloadRenamedImages() {
             const status = document.getElementById('statusImageRename');
+            const preview = document.getElementById('previewImageRename');
             try {
-                const matched = getImageRenameItems().filter((item) => item.matched);
-                if (!matched.length) throw new Error('Select a parent folder containing supported visual folders first');
+                const items = getImageRenameItems();
+                const summary = renderImageRenameSummary(items, true);
+                if (!summary.matched.length && !summary.skipped.length) throw new Error('Select a parent folder containing images first');
                 if (typeof JSZip === 'undefined') throw new Error('ZIP library failed to load. Check the network connection and reload the page');
-                showStatus(status, `Building ZIP with ${matched.length} renamed images...`, 'loading');
+                showStatus(status, `Building ZIP with ${summary.matched.length} renamed images and ${summary.skipped.length} manual review file(s)...`, 'loading');
                 const zip = new JSZip();
-                matched.forEach((item) => zip.file(`${item.outputFolder}/${item.newName}`, item.file));
+                summary.matched.forEach((item) => zip.file(`${item.outputFolder}/${item.newName}`, item.file));
+                summary.skipped.forEach((item, index) => zip.file(getManualReviewPath(item, index), item.file));
                 const blob = await zip.generateAsync({ type: 'blob' });
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement('a');
@@ -5496,7 +5534,8 @@
                 link.click();
                 link.remove();
                 setTimeout(() => URL.revokeObjectURL(url), 1000);
-                showStatus(status, `Export complete. ${matched.length} renamed images were written to renamed_images.zip.`, 'success');
+                showPreview(preview, summary.html);
+                showStatus(status, `Export complete. ${summary.matched.length} renamed images were written.${summary.skipped.length ? ` ${summary.skipped.length} unmatched file(s) were copied into ${escapeHtml(IMAGE_REVIEW_FOLDER)} for manual review.` : ''}`, 'success');
             } catch (error) {
                 showStatus(status, `Error: ${escapeHtml(error.message)}`, 'error');
             }
