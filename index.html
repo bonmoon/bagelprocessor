@@ -1713,7 +1713,6 @@
             </button>
             <div class="sidebar-module-list">
                 <a class="sidebar-module-link" data-module="module-05" onclick="openModule('module-05')">Client File Comparison</a>
-                <a class="sidebar-module-link" data-module="module-06" onclick="openModule('module-06')">Update QA Verification</a>
             </div>
         </div>
         <div class="sidebar-group">
@@ -1778,7 +1777,7 @@
                 <div class="group-chip-thumb"></div>
                 <div class="group-chip-copy">
                     <strong>Product Comparison</strong>
-                    <span>Change detection, lookup, and QA checks</span>
+                    <span>Change detection, lookup, and index match checks</span>
                 </div>
                 <div class="group-chip-arrow">↓</div>
             </a>
@@ -2211,9 +2210,10 @@
                             </div>
                         </div>
                         <p class="helper-text" style="margin-top: 12px;">
-                            The master workbook is cleaned automatically before comparison. By default, only rows with
-                            <strong>Owner = Client</strong> are compared. After both files are loaded, add one or more retailer
-                            groups and choose which columns should be used as identifiers on each side.
+                            For Change Detection and Master Lookup, upload the standard raw requirement/master workbook in
+                            <strong>Master workbook</strong>, just like the other master-list modules. The tool cleans it automatically,
+                            keeps rows with usable RPC/URL values, and by default compares only rows where <strong>Owner = Client</strong>.
+                            If your team only needs a quick two-file match without a requirement file, use <strong>Index Match Check</strong> below.
                         </p>
                         <div class="mini-stats">
                             <div class="mini-stat">
@@ -2298,113 +2298,74 @@
                                 <button class="btn" onclick="previewMasterLookup()">Preview</button>
                             </div>
                         </div>
+                        <div class="subsection">
+                            <div class="subsection-title">Index Match Check</div>
+                            <div class="subsection-copy">A quick VLOOKUP-style check for any two product lists. Upload your own master list and the client input, choose the sheet and identifier column on each side, then export two tabs with the original columns plus <strong>Check Result</strong>.</div>
+                            <div class="field-grid">
+                                <div class="field">
+                                    <label for="indexMatchMasterFile">Your product list</label>
+                                    <input type="file" id="indexMatchMasterFile" accept=".xlsx,.xls">
+                                </div>
+                                <div class="field">
+                                    <label for="indexMatchClientFile">Client input file</label>
+                                    <input type="file" id="indexMatchClientFile" accept=".xlsx,.xls">
+                                </div>
+                                <div class="field-full">
+                                    <div class="toggle-row">
+                                        <span>Compare for <strong>Lazada short version</strong> identifiers</span>
+                                        <input type="checkbox" id="indexMatchLazada" onchange="updateIndexMatchConfig('compareForLazada', this.checked)">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mini-stats">
+                                <div class="mini-stat">
+                                    <strong id="indexMatchMasterCount">0</strong>
+                                    <span>master rows ready</span>
+                                </div>
+                                <div class="mini-stat">
+                                    <strong id="indexMatchClientCount">0</strong>
+                                    <span>client rows ready</span>
+                                </div>
+                                <div class="mini-stat">
+                                    <strong id="indexMatchMode">Standard</strong>
+                                    <span>comparison mode</span>
+                                </div>
+                            </div>
+                            <div class="config-actions">
+                                <button class="btn btn-subtle" type="button" onclick="initializeIndexMatchState()">Load Index Match Headers</button>
+                            </div>
+                            <div class="config-list">
+                                <div class="config-row">
+                                    <div class="config-row-head">
+                                        <div class="config-row-title">Match Setup</div>
+                                    </div>
+                                    <div class="field-grid">
+                                        <div class="field">
+                                            <label>Master sheet</label>
+                                            <select class="select-input" id="indexMatchMasterSheet" onchange="updateIndexMatchConfig('masterSheet', this.value)"></select>
+                                        </div>
+                                        <div class="field">
+                                            <label>Master identifier</label>
+                                            <select class="select-input" id="indexMatchMasterColumn" onchange="updateIndexMatchConfig('masterColumn', this.value)"></select>
+                                        </div>
+                                        <div class="field">
+                                            <label>Client sheet</label>
+                                            <select class="select-input" id="indexMatchClientSheet" onchange="updateIndexMatchConfig('clientSheet', this.value)"></select>
+                                        </div>
+                                        <div class="field">
+                                            <label>Client identifier</label>
+                                            <select class="select-input" id="indexMatchClientColumn" onchange="updateIndexMatchConfig('clientColumn', this.value)"></select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="actions">
+                                <button class="btn btn-primary" onclick="processIndexMatchCheck()">Export Index Match Check</button>
+                                <button class="btn" onclick="previewIndexMatchCheck()">Preview</button>
+                            </div>
+                        </div>
                         <div id="statusComparison" class="status"></div>
                         <div id="previewComparison" class="preview"></div>
-                    </div>
-                </div>
-                </div>
-            </article>
-
-            <article class="module-card" data-asset="2" data-group="comparison" id="module-06">
-                <div class="module-card-header" onclick="toggleModule('module-06')">
-                    <div class="module-card-header-left">
-                        <div class="module-tag">06</div>
-                        <h2 class="module-title">Update QA Verification</h2>
-                        <span class="module-card-header-copy">Verify additions and removals in latest file</span>
-                    </div>
-                    <div class="module-collapse-icon">▼</div>
-                </div>
-                <div class="module-card-body">
-                <div class="module-inner">
-                    <div class="feature-list">
-                        <div class="feature-badge">Source workbook with multiple sheets</div>
-                        <div class="feature-badge">Raw latest file cleanup included</div>
-                        <div class="feature-badge">Verification status export</div>
-                    </div>
-                    <div class="panel">
-                        <div class="field-grid">
-                            <div class="field">
-                                <label for="qaSourceFile">Source workbook</label>
-                                <input type="file" id="qaSourceFile" accept=".xlsx,.xls">
-                            </div>
-                            <div class="field">
-                                <label for="qaLatestFile">Latest raw workbook</label>
-                                <input type="file" id="qaLatestFile" accept=".xlsx,.xls">
-                            </div>
-                        </div>
-                        <p class="helper-text" style="margin-top: 12px;">
-                            Upload the source workbook generated for the request and the latest raw requirement workbook.
-                            The latest raw workbook is cleaned automatically before verification.
-                        </p>
-                        <div class="mini-stats">
-                            <div class="mini-stat">
-                                <strong id="qaSourceSheetCount">0</strong>
-                                <span>source sheets ready</span>
-                            </div>
-                            <div class="mini-stat">
-                                <strong id="qaLatestRowCount">0</strong>
-                                <span>latest rows ready</span>
-                            </div>
-                            <div class="mini-stat">
-                                <strong id="qaConfigCount">0</strong>
-                                <span>verification configs ready</span>
-                            </div>
-                        </div>
-                        <div class="config-actions">
-                            <button class="btn btn-subtle" type="button" onclick="initializeQAState()">Load QA Headers</button>
-                        </div>
-                        <div class="config-list">
-                            <div class="config-row">
-                                <div class="config-row-head">
-                                    <div class="config-row-title">Addition Verification</div>
-                                </div>
-                                <div class="field-grid">
-                                    <div class="field">
-                                        <label>Source sheet</label>
-                                        <select class="select-input" id="qaAdditionSheet" onchange="updateQAConfig('additionSheet', this.value)">
-                                        </select>
-                                    </div>
-                                    <div class="field">
-                                        <label>Source identifier</label>
-                                        <select class="select-input" id="qaAdditionSourceColumn" onchange="updateQAConfig('additionSourceColumn', this.value)">
-                                        </select>
-                                    </div>
-                                    <div class="field">
-                                        <label>Latest identifier</label>
-                                        <select class="select-input" id="qaAdditionLatestColumn" onchange="updateQAConfig('additionLatestColumn', this.value)">
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="config-row">
-                                <div class="config-row-head">
-                                    <div class="config-row-title">Removal Verification</div>
-                                </div>
-                                <div class="field-grid">
-                                    <div class="field">
-                                        <label>Source sheet</label>
-                                        <select class="select-input" id="qaRemovalSheet" onchange="updateQAConfig('removalSheet', this.value)">
-                                        </select>
-                                    </div>
-                                    <div class="field">
-                                        <label>Source identifier</label>
-                                        <select class="select-input" id="qaRemovalSourceColumn" onchange="updateQAConfig('removalSourceColumn', this.value)">
-                                        </select>
-                                    </div>
-                                    <div class="field">
-                                        <label>Latest identifier</label>
-                                        <select class="select-input" id="qaRemovalLatestColumn" onchange="updateQAConfig('removalLatestColumn', this.value)">
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="actions">
-                            <button class="btn btn-primary" onclick="processQAVerification()">Verify and Export</button>
-                            <button class="btn" onclick="previewQAVerification()">Preview QA Result</button>
-                        </div>
-                        <div id="statusQA" class="status"></div>
-                        <div id="previewQA" class="preview"></div>
                     </div>
                 </div>
                 </div>
@@ -2453,22 +2414,21 @@
                 masterMatchColumns: new Set(),
                 masterOutputColumns: new Set()
             },
-            lastResult: null
-        };
-        const qaState = {
-            sourceWorkbook: null,
-            latestWorkbook: null,
-            sourceSheets: {},
-            sourceSheetNames: [],
-            latestHeaders: [],
-            latestRows: [],
-            config: {
-                additionSheet: '',
-                additionSourceColumn: '',
-                additionLatestColumn: '',
-                removalSheet: '',
-                removalSourceColumn: '',
-                removalLatestColumn: ''
+            indexMatch: {
+                masterWorkbook: null,
+                clientWorkbook: null,
+                masterSheets: {},
+                clientSheets: {},
+                masterSheetNames: [],
+                clientSheetNames: [],
+                config: {
+                    masterSheet: '',
+                    masterColumn: '',
+                    clientSheet: '',
+                    clientColumn: '',
+                    compareForLazada: false
+                },
+                lastResult: null
             },
             lastResult: null
         };
@@ -2513,8 +2473,8 @@
         document.getElementById('categoryFilterFile').addEventListener('change', initializeCategoryFilterState);
         document.getElementById('comparisonMasterFile').addEventListener('change', initializeComparisonState);
         document.getElementById('comparisonClientFile').addEventListener('change', initializeComparisonState);
-        document.getElementById('qaSourceFile').addEventListener('change', initializeQAState);
-        document.getElementById('qaLatestFile').addEventListener('change', initializeQAState);
+        document.getElementById('indexMatchMasterFile').addEventListener('change', initializeIndexMatchState);
+        document.getElementById('indexMatchClientFile').addEventListener('change', initializeIndexMatchState);
         document.getElementById('imageEvFolderInput').addEventListener('change', previewRenamedImages);
         document.getElementById('blankEvRequirementFile').addEventListener('change', initializeBlankEvState);
         document.getElementById('categorySelectorTrigger').addEventListener('click', toggleCategorySelector);
@@ -2615,7 +2575,7 @@
                 {
                     key: 'comparison',
                     title: 'Product Comparison',
-                    copy: 'Client comparison, lookup enrichment, and post-update QA verification.',
+                    copy: 'Change detection, lookup enrichment, and quick index-match checks.',
                 },
                 {
                     key: 'removal',
@@ -4376,6 +4336,262 @@
             }
         }
 
+        function getPreferredIdentifierColumn(headers) {
+            return headers.find((header) => /\brpc\b/i.test(String(header)))
+                || headers.find((header) => /product\s*id|sku|identifier|code/i.test(String(header)))
+                || headers[0]
+                || '';
+        }
+
+        function getIndexMatchState() {
+            return comparisonState.indexMatch;
+        }
+
+        function normalizeIndexMatchIdentifier(value, compareForLazada) {
+            const normalized = normalizeIdentifier(value);
+            if (!normalized) return '';
+            if (!compareForLazada) return normalized;
+            return normalized.split('_')[0].trim() || normalized;
+        }
+
+        function renderIndexMatchControls() {
+            const state = getIndexMatchState();
+            const config = state.config;
+            const masterSheet = config.masterSheet && state.masterSheets[config.masterSheet]
+                ? state.masterSheets[config.masterSheet]
+                : null;
+            const clientSheet = config.clientSheet && state.clientSheets[config.clientSheet]
+                ? state.clientSheets[config.clientSheet]
+                : null;
+
+            document.getElementById('indexMatchMasterSheet').innerHTML = buildSelectOptions(state.masterSheetNames, config.masterSheet, 'Choose master sheet');
+            document.getElementById('indexMatchClientSheet').innerHTML = buildSelectOptions(state.clientSheetNames, config.clientSheet, 'Choose client sheet');
+            document.getElementById('indexMatchMasterColumn').innerHTML = buildSelectOptions(masterSheet ? masterSheet.headers : [], config.masterColumn, 'Choose master identifier');
+            document.getElementById('indexMatchClientColumn').innerHTML = buildSelectOptions(clientSheet ? clientSheet.headers : [], config.clientColumn, 'Choose client identifier');
+            document.getElementById('indexMatchLazada').checked = Boolean(config.compareForLazada);
+            document.getElementById('indexMatchMasterCount').textContent = String(masterSheet ? masterSheet.rows.length : 0);
+            document.getElementById('indexMatchClientCount').textContent = String(clientSheet ? clientSheet.rows.length : 0);
+            document.getElementById('indexMatchMode').textContent = config.compareForLazada ? 'Lazada' : 'Standard';
+        }
+
+        function updateIndexMatchConfig(field, value) {
+            const state = getIndexMatchState();
+            state.config[field] = value;
+            if (field === 'masterSheet') {
+                const sheet = state.masterSheets[value];
+                state.config.masterColumn = sheet ? getPreferredIdentifierColumn(sheet.headers) : '';
+            }
+            if (field === 'clientSheet') {
+                const sheet = state.clientSheets[value];
+                state.config.clientColumn = sheet ? getPreferredIdentifierColumn(sheet.headers) : '';
+            }
+            state.lastResult = null;
+            renderIndexMatchControls();
+        }
+
+        async function initializeIndexMatchState() {
+            const status = document.getElementById('statusComparison');
+            const preview = document.getElementById('previewComparison');
+            hidePreview(preview);
+
+            const masterInput = document.getElementById('indexMatchMasterFile');
+            const clientInput = document.getElementById('indexMatchClientFile');
+            const state = getIndexMatchState();
+            if (!masterInput.files.length || !clientInput.files.length) {
+                renderIndexMatchControls();
+                return;
+            }
+
+            try {
+                showStatus(status, 'Loading files for Index Match Check...', 'loading');
+                const [masterWorkbook, clientWorkbook] = await Promise.all([
+                    readWorkbookFromInput(masterInput),
+                    readWorkbookFromInput(clientInput)
+                ]);
+                const masterSheets = getWorkbookSheetRows(masterWorkbook);
+                const clientSheets = getWorkbookSheetRows(clientWorkbook);
+                const masterSheetNames = Object.keys(masterSheets);
+                const clientSheetNames = Object.keys(clientSheets);
+                if (!masterSheetNames.length) throw new Error('No non-empty sheets were found in your product list');
+                if (!clientSheetNames.length) throw new Error('No non-empty sheets were found in the client input file');
+
+                state.masterWorkbook = masterWorkbook;
+                state.clientWorkbook = clientWorkbook;
+                state.masterSheets = masterSheets;
+                state.clientSheets = clientSheets;
+                state.masterSheetNames = masterSheetNames;
+                state.clientSheetNames = clientSheetNames;
+                state.config.masterSheet = state.config.masterSheet && masterSheets[state.config.masterSheet] ? state.config.masterSheet : masterSheetNames[0];
+                state.config.clientSheet = state.config.clientSheet && clientSheets[state.config.clientSheet] ? state.config.clientSheet : clientSheetNames[0];
+                state.config.masterColumn = getPreferredIdentifierColumn(masterSheets[state.config.masterSheet].headers);
+                state.config.clientColumn = getPreferredIdentifierColumn(clientSheets[state.config.clientSheet].headers);
+                state.lastResult = null;
+
+                renderIndexMatchControls();
+                showStatus(status, `Index Match headers loaded. Master rows: ${masterSheets[state.config.masterSheet].rows.length}. Client rows: ${clientSheets[state.config.clientSheet].rows.length}. Choose identifiers and run export.`, 'success');
+            } catch (error) {
+                state.masterWorkbook = null;
+                state.clientWorkbook = null;
+                state.masterSheets = {};
+                state.clientSheets = {};
+                state.masterSheetNames = [];
+                state.clientSheetNames = [];
+                state.lastResult = null;
+                renderIndexMatchControls();
+                showStatus(status, `Error: ${error.message}`, 'error');
+            }
+        }
+
+        function buildIdentifierSet(rows, columnName, compareForLazada) {
+            const set = new Set();
+            rows.forEach((row) => {
+                const identifier = normalizeIndexMatchIdentifier(row[columnName], compareForLazada);
+                if (identifier) set.add(identifier);
+            });
+            return set;
+        }
+
+        function appendCheckResultRows(sourceRows, sourceHeaders, identifierColumn, targetIdentifierSet, compareForLazada, notFoundLabel) {
+            return sourceRows.map((row) => {
+                const identifier = normalizeIndexMatchIdentifier(row[identifierColumn], compareForLazada);
+                const resultRow = {};
+                sourceHeaders.forEach((header) => {
+                    resultRow[header] = row[header] ?? '';
+                });
+                resultRow['Check Result'] = identifier && targetIdentifierSet.has(identifier) ? 'exist' : notFoundLabel;
+                return resultRow;
+            });
+        }
+
+        function buildIndexMatchResult() {
+            const state = getIndexMatchState();
+            const config = state.config;
+            const masterSheet = state.masterSheets[config.masterSheet];
+            const clientSheet = state.clientSheets[config.clientSheet];
+            if (!masterSheet || !clientSheet) {
+                throw new Error('Please load both files and choose the sheets first');
+            }
+            if (!config.masterColumn || !config.clientColumn) {
+                throw new Error('Please choose identifier columns for both files');
+            }
+
+            const compareForLazada = Boolean(config.compareForLazada);
+            const masterIds = buildIdentifierSet(masterSheet.rows, config.masterColumn, compareForLazada);
+            const clientIds = buildIdentifierSet(clientSheet.rows, config.clientColumn, compareForLazada);
+            const masterHeaders = [...masterSheet.headers, 'Check Result'];
+            const clientHeaders = [...clientSheet.headers, 'Check Result'];
+            const masterRows = appendCheckResultRows(
+                masterSheet.rows,
+                masterSheet.headers,
+                config.masterColumn,
+                clientIds,
+                compareForLazada,
+                'not found in client file'
+            );
+            const clientRows = appendCheckResultRows(
+                clientSheet.rows,
+                clientSheet.headers,
+                config.clientColumn,
+                masterIds,
+                compareForLazada,
+                'not found in master file'
+            );
+            const countByStatus = (rows) => rows.reduce((acc, row) => {
+                acc[row['Check Result']] = (acc[row['Check Result']] || 0) + 1;
+                return acc;
+            }, {});
+
+            return {
+                masterHeaders,
+                clientHeaders,
+                masterRows,
+                clientRows,
+                masterCounts: countByStatus(masterRows),
+                clientCounts: countByStatus(clientRows),
+                compareForLazada,
+                config: { ...config }
+            };
+        }
+
+        function applyCheckResultColors(worksheet, matrix) {
+            const statusIndex = matrix[0].indexOf('Check Result');
+            if (statusIndex === -1) return;
+            for (let rowIndex = 1; rowIndex < matrix.length; rowIndex += 1) {
+                const value = String(matrix[rowIndex][statusIndex] ?? '').toLowerCase();
+                const cellAddress = XLSX.utils.encode_cell({ r: rowIndex, c: statusIndex });
+                if (!worksheet[cellAddress]) continue;
+                worksheet[cellAddress].s = worksheet[cellAddress].s || {};
+                worksheet[cellAddress].s.font = { bold: true, color: { rgb: '1F1F1F' } };
+                if (value === 'exist') {
+                    worksheet[cellAddress].s.fill = { fgColor: { rgb: 'CDEFD8' } };
+                } else if (value.includes('not found')) {
+                    worksheet[cellAddress].s.fill = { fgColor: { rgb: 'F6D1CF' } };
+                }
+            }
+        }
+
+        async function processIndexMatchCheck() {
+            const status = document.getElementById('statusComparison');
+            try {
+                showStatus(status, 'Building two-way Index Match Check workbook...', 'loading');
+                const result = buildIndexMatchResult();
+                getIndexMatchState().lastResult = result;
+
+                const masterMatrix = [result.masterHeaders, ...result.masterRows.map((row) => result.masterHeaders.map((header) => row[header] !== undefined ? row[header] : ''))];
+                const clientMatrix = [result.clientHeaders, ...result.clientRows.map((row) => result.clientHeaders.map((header) => row[header] !== undefined ? row[header] : ''))];
+                const masterSheet = XLSX.utils.aoa_to_sheet(masterMatrix);
+                const clientSheet = XLSX.utils.aoa_to_sheet(clientMatrix);
+                applySheetStyles(masterSheet, masterMatrix);
+                applySheetStyles(clientSheet, clientMatrix);
+                applyCheckResultColors(masterSheet, masterMatrix);
+                applyCheckResultColors(clientSheet, clientMatrix);
+
+                const workbookOut = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(workbookOut, masterSheet, 'Master Check');
+                XLSX.utils.book_append_sheet(workbookOut, clientSheet, 'Client Check');
+                XLSX.writeFile(workbookOut, result.compareForLazada ? 'index_match_check_lazada.xlsx' : 'index_match_check.xlsx');
+                showStatus(
+                    status,
+                    `Index Match export complete. Master exist: ${result.masterCounts.exist || 0}, not found in client: ${result.masterCounts['not found in client file'] || 0}. Client exist: ${result.clientCounts.exist || 0}, not found in master: ${result.clientCounts['not found in master file'] || 0}.`,
+                    'success'
+                );
+            } catch (error) {
+                showStatus(status, `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function previewIndexMatchCheck() {
+            const preview = document.getElementById('previewComparison');
+            try {
+                const result = buildIndexMatchResult();
+                getIndexMatchState().lastResult = result;
+                const masterSample = result.masterRows.slice(0, 3).map((row, index) => `
+                    <div class="preview-row">
+                        <strong>Master Row ${index + 1}</strong><br>
+                        Identifier: ${escapeHtml(row[result.config.masterColumn] ?? '')}<br>
+                        Check Result: ${escapeHtml(row['Check Result'])}
+                    </div>
+                `).join('');
+                const clientSample = result.clientRows.slice(0, 3).map((row, index) => `
+                    <div class="preview-row">
+                        <strong>Client Row ${index + 1}</strong><br>
+                        Identifier: ${escapeHtml(row[result.config.clientColumn] ?? '')}<br>
+                        Check Result: ${escapeHtml(row['Check Result'])}
+                    </div>
+                `).join('');
+                showPreview(
+                    preview,
+                    `<div class="preview-title">Index Match preview</div>
+                     <div class="preview-row">Mode: ${result.compareForLazada ? 'Lazada short version' : 'Standard'}<br>
+                     Master exist: ${result.masterCounts.exist || 0} | Not found in client file: ${result.masterCounts['not found in client file'] || 0}<br>
+                     Client exist: ${result.clientCounts.exist || 0} | Not found in master file: ${result.clientCounts['not found in master file'] || 0}</div>
+                     ${masterSample}${clientSample}`
+                );
+            } catch (error) {
+                showPreview(preview, `<div class="preview-title">Index Match error</div><div class="preview-row">${escapeHtml(error.message)}</div>`);
+            }
+        }
+
         function getWorkbookSheetRows(workbook) {
             const sheets = {};
             workbook.SheetNames.forEach((sheetName) => {
@@ -4396,255 +4612,6 @@
                 sheets[sheetName] = { headers, rows };
             });
             return sheets;
-        }
-
-        function updateQAStats() {
-            document.getElementById('qaSourceSheetCount').textContent = String(qaState.sourceSheetNames.length);
-            document.getElementById('qaLatestRowCount').textContent = String(qaState.latestRows.length);
-            const readyCount = [
-                qaState.config.additionSheet && qaState.config.additionSourceColumn && qaState.config.additionLatestColumn,
-                qaState.config.removalSheet && qaState.config.removalSourceColumn && qaState.config.removalLatestColumn
-            ].filter(Boolean).length;
-            document.getElementById('qaConfigCount').textContent = String(readyCount);
-        }
-
-        function renderQASelectors() {
-            document.getElementById('qaAdditionSheet').innerHTML = buildSelectOptions(qaState.sourceSheetNames, qaState.config.additionSheet, 'Choose source sheet');
-            document.getElementById('qaRemovalSheet').innerHTML = buildSelectOptions(qaState.sourceSheetNames, qaState.config.removalSheet, 'Choose source sheet');
-
-            const additionHeaders = qaState.config.additionSheet && qaState.sourceSheets[qaState.config.additionSheet]
-                ? qaState.sourceSheets[qaState.config.additionSheet].headers
-                : [];
-            const removalHeaders = qaState.config.removalSheet && qaState.sourceSheets[qaState.config.removalSheet]
-                ? qaState.sourceSheets[qaState.config.removalSheet].headers
-                : [];
-
-            document.getElementById('qaAdditionSourceColumn').innerHTML = buildSelectOptions(additionHeaders, qaState.config.additionSourceColumn, 'Choose identifier column');
-            document.getElementById('qaRemovalSourceColumn').innerHTML = buildSelectOptions(removalHeaders, qaState.config.removalSourceColumn, 'Choose identifier column');
-            document.getElementById('qaAdditionLatestColumn').innerHTML = buildSelectOptions(qaState.latestHeaders, qaState.config.additionLatestColumn, 'Choose latest identifier');
-            document.getElementById('qaRemovalLatestColumn').innerHTML = buildSelectOptions(qaState.latestHeaders, qaState.config.removalLatestColumn, 'Choose latest identifier');
-            updateQAStats();
-        }
-
-        function updateQAConfig(field, value) {
-            qaState.config[field] = value;
-            if (field === 'additionSheet') qaState.config.additionSourceColumn = '';
-            if (field === 'removalSheet') qaState.config.removalSourceColumn = '';
-            renderQASelectors();
-        }
-
-        async function initializeQAState() {
-            const status = document.getElementById('statusQA');
-            const preview = document.getElementById('previewQA');
-            hidePreview(preview);
-
-            const sourceInput = document.getElementById('qaSourceFile');
-            const latestInput = document.getElementById('qaLatestFile');
-            if (!sourceInput.files.length || !latestInput.files.length) {
-                renderQASelectors();
-                return;
-            }
-
-            try {
-                showStatus(status, 'Loading source workbook and latest raw workbook...', 'loading');
-                const [sourceWorkbook, latestWorkbook] = await Promise.all([
-                    readWorkbookFromInput(sourceInput),
-                    readWorkbookFromInput(latestInput)
-                ]);
-
-                const sourceSheets = getWorkbookSheetRows(sourceWorkbook);
-                const sourceSheetNames = Object.keys(sourceSheets);
-                if (!sourceSheetNames.length) throw new Error('No non-empty sheets were found in the source workbook');
-
-                const latestSheetName = findBestSheetName(latestWorkbook, ['product list', 'master', 'products']);
-                const latestWorksheet = latestWorkbook.Sheets[latestSheetName];
-                const latestProcessed = processWorksheetData(latestWorksheet, COLUMNS_TO_DROP);
-                const latestRows = filterRowsWithContent(latestProcessed.data, latestProcessed.headers);
-                if (!latestRows.length) throw new Error('No comparable rows were found in the latest raw workbook');
-
-                qaState.sourceWorkbook = sourceWorkbook;
-                qaState.latestWorkbook = latestWorkbook;
-                qaState.sourceSheets = sourceSheets;
-                qaState.sourceSheetNames = sourceSheetNames;
-                qaState.latestHeaders = latestProcessed.headers;
-                qaState.latestRows = latestRows;
-                qaState.lastResult = null;
-                qaState.config = {
-                    additionSheet: sourceSheetNames.find((name) => name.toLowerCase().includes('addition')) || sourceSheetNames[0] || '',
-                    additionSourceColumn: '',
-                    additionLatestColumn: '',
-                    removalSheet: sourceSheetNames.find((name) => name.toLowerCase().includes('removal')) || sourceSheetNames[0] || '',
-                    removalSourceColumn: '',
-                    removalLatestColumn: ''
-                };
-
-                renderQASelectors();
-                showStatus(status, `QA files loaded. Source sheets: ${sourceSheetNames.length}. Latest comparable rows: ${latestRows.length}.`, 'success');
-            } catch (error) {
-                showStatus(status, `Error: ${error.message}`, 'error');
-            }
-        }
-
-        function normalizeVerificationIdentifier(value, columnName) {
-            const normalized = normalizeIdentifier(value);
-            if (!normalized) return '';
-            if (String(columnName).toLowerCase().includes('lazada')) {
-                const shortCode = normalized.split('_')[0];
-                return shortCode || normalized;
-            }
-            return normalized;
-        }
-
-        function buildVerificationMap(rows, columnName) {
-            const identifierMap = new Map();
-            rows.forEach((row) => {
-                const identifier = normalizeVerificationIdentifier(row[columnName], columnName);
-                if (!identifier || identifierMap.has(identifier)) return;
-                identifierMap.set(identifier, row);
-            });
-            return identifierMap;
-        }
-
-        function applyVerificationStatusColors(worksheet, matrix, statusColumnName) {
-            const headerIndex = matrix[0].indexOf(statusColumnName);
-            if (headerIndex === -1) return;
-            for (let rowIndex = 1; rowIndex < matrix.length; rowIndex += 1) {
-                const value = String(matrix[rowIndex][headerIndex] ?? '').toLowerCase();
-                if (!value) continue;
-                const cellAddress = XLSX.utils.encode_cell({ r: rowIndex, c: headerIndex });
-                if (!worksheet[cellAddress]) continue;
-                worksheet[cellAddress].s = worksheet[cellAddress].s || {};
-                worksheet[cellAddress].s.font = { bold: true, color: { rgb: '1F1F1F' } };
-                if (value === 'added already' || value === 'deleted already') {
-                    worksheet[cellAddress].s.fill = { fgColor: { rgb: 'CDEFD8' } };
-                } else if (value === 'not exist' || value === 'still exists') {
-                    worksheet[cellAddress].s.fill = { fgColor: { rgb: 'F6D1CF' } };
-                }
-            }
-        }
-
-        function buildVerificationRows(sheetName, sourceColumn, latestColumn, mode) {
-            const sourceSheet = qaState.sourceSheets[sheetName];
-            if (!sourceSheet) throw new Error(`Source sheet "${sheetName}" is not available`);
-            const latestMap = buildVerificationMap(qaState.latestRows, latestColumn);
-
-            const rows = sourceSheet.rows.map((row) => {
-                const identifier = normalizeVerificationIdentifier(row[sourceColumn], sourceColumn);
-                const latestMatch = identifier ? latestMap.get(identifier) : null;
-                const status = mode === 'addition'
-                    ? (latestMatch ? 'Added Already' : 'Not Exist')
-                    : (latestMatch ? 'Still Exists' : 'Deleted Already');
-                const resultRow = {
-                    'QA Source Sheet': sheetName,
-                    'QA Source Identifier Column': sourceColumn,
-                    'QA Latest Identifier Column': latestColumn,
-                    'QA Identifier': row[sourceColumn] ?? '',
-                    'QA Status': status,
-                    'QA Latest Match Found': latestMatch ? 'Yes' : 'No'
-                };
-                sourceSheet.headers.forEach((header) => {
-                    resultRow[header] = row[header] ?? '';
-                });
-                return resultRow;
-            });
-
-            const headers = [
-                'QA Source Sheet',
-                'QA Source Identifier Column',
-                'QA Latest Identifier Column',
-                'QA Identifier',
-                'QA Status',
-                'QA Latest Match Found',
-                ...sourceSheet.headers
-            ];
-
-            const counts = rows.reduce((acc, row) => {
-                acc[row['QA Status']] = (acc[row['QA Status']] || 0) + 1;
-                return acc;
-            }, {});
-
-            return { headers, rows, counts };
-        }
-
-        function buildQAResult() {
-            if (!qaState.sourceSheetNames.length || !qaState.latestRows.length) {
-                throw new Error('Please load the source workbook and latest raw workbook first');
-            }
-
-            const config = qaState.config;
-            if (!config.additionSheet || !config.additionSourceColumn || !config.additionLatestColumn || !config.removalSheet || !config.removalSourceColumn || !config.removalLatestColumn) {
-                throw new Error('Please configure both addition and removal verification settings');
-            }
-
-            return {
-                additions: buildVerificationRows(config.additionSheet, config.additionSourceColumn, config.additionLatestColumn, 'addition'),
-                removals: buildVerificationRows(config.removalSheet, config.removalSourceColumn, config.removalLatestColumn, 'removal')
-            };
-        }
-
-        async function processQAVerification() {
-            const status = document.getElementById('statusQA');
-
-            try {
-                showStatus(status, 'Verifying requested additions and removals against the latest raw workbook...', 'loading');
-                const result = buildQAResult();
-                qaState.lastResult = result;
-
-                const workbookOut = XLSX.utils.book_new();
-                const additionsMatrix = [result.additions.headers, ...result.additions.rows.map((row) => result.additions.headers.map((header) => row[header] !== undefined ? row[header] : ''))];
-                const removalsMatrix = [result.removals.headers, ...result.removals.rows.map((row) => result.removals.headers.map((header) => row[header] !== undefined ? row[header] : ''))];
-
-                const additionsSheet = XLSX.utils.aoa_to_sheet(additionsMatrix);
-                const removalsSheet = XLSX.utils.aoa_to_sheet(removalsMatrix);
-                applySheetStyles(additionsSheet, additionsMatrix);
-                applySheetStyles(removalsSheet, removalsMatrix);
-                applyVerificationStatusColors(additionsSheet, additionsMatrix, 'QA Status');
-                applyVerificationStatusColors(removalsSheet, removalsMatrix, 'QA Status');
-                XLSX.utils.book_append_sheet(workbookOut, additionsSheet, 'Addition QA');
-                XLSX.utils.book_append_sheet(workbookOut, removalsSheet, 'Removal QA');
-                XLSX.writeFile(workbookOut, 'update_qa_verification.xlsx');
-
-                showStatus(status, `QA export complete. Additions: ${result.additions.counts['Added Already'] || 0} added, ${result.additions.counts['Not Exist'] || 0} not found. Removals: ${result.removals.counts['Deleted Already'] || 0} deleted, ${result.removals.counts['Still Exists'] || 0} still exist.`, 'success');
-            } catch (error) {
-                showStatus(status, `Error: ${error.message}`, 'error');
-            }
-        }
-
-        async function previewQAVerification() {
-            const preview = document.getElementById('previewQA');
-
-            try {
-                const result = buildQAResult();
-                qaState.lastResult = result;
-                const summary = `
-                    <div class="preview-row">
-                        <strong>Addition QA</strong><br>
-                        Added Already: ${result.additions.counts['Added Already'] || 0} | Not Exist: ${result.additions.counts['Not Exist'] || 0}
-                    </div>
-                    <div class="preview-row">
-                        <strong>Removal QA</strong><br>
-                        Deleted Already: ${result.removals.counts['Deleted Already'] || 0} | Still Exists: ${result.removals.counts['Still Exists'] || 0}
-                    </div>
-                `;
-                const additionPreview = result.additions.rows.slice(0, 3).map((row, index) => `
-                    <div class="preview-row">
-                        <strong>Addition QA ${index + 1}</strong><br>
-                        Identifier: ${escapeHtml(row['QA Identifier'])}<br>
-                        Status: ${escapeHtml(row['QA Status'])}
-                    </div>
-                `).join('');
-                const removalPreview = result.removals.rows.slice(0, 3).map((row, index) => `
-                    <div class="preview-row">
-                        <strong>Removal QA ${index + 1}</strong><br>
-                        Identifier: ${escapeHtml(row['QA Identifier'])}<br>
-                        Status: ${escapeHtml(row['QA Status'])}
-                    </div>
-                `).join('');
-
-                showPreview(preview, `<div class="preview-title">QA verification preview</div>${summary}${additionPreview}${removalPreview}`);
-            } catch (error) {
-                showPreview(preview, `<div class="preview-title">QA verification error</div><div class="preview-row">${escapeHtml(error.message)}</div>`);
-            }
         }
 
         async function processCategoriesHierarchy() {
