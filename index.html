@@ -908,6 +908,16 @@
             background: var(--accent-strong);
         }
 
+        .btn.btn-primary {
+            background: var(--accent);
+            color: white;
+            box-shadow: 0 10px 20px rgba(31, 106, 93, 0.18);
+        }
+
+        .btn.btn-primary:hover {
+            background: var(--accent-strong);
+        }
+
         .status {
             display: none;
             margin-top: 16px;
@@ -972,6 +982,74 @@
 
         .preview-row strong {
             color: var(--accent-strong);
+        }
+
+        .preview-table-wrap {
+            overflow: auto;
+            border-radius: 16px;
+            border: 1px solid rgba(76, 57, 34, 0.08);
+            background: rgba(255, 255, 255, 0.76);
+            margin-bottom: 12px;
+        }
+
+        .preview-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            min-width: 720px;
+            font-size: 12px;
+        }
+
+        .preview-table th,
+        .preview-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid rgba(76, 57, 34, 0.07);
+            text-align: left;
+            vertical-align: top;
+            white-space: nowrap;
+        }
+
+        .preview-table th {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            background: #e8f4f7;
+            color: #0b557e;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .preview-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .preview-table tr:nth-child(even) td {
+            background: rgba(232, 244, 247, 0.35);
+        }
+
+        .preview-chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 8px;
+            border-radius: 999px;
+            font-weight: 800;
+            font-size: 11px;
+        }
+
+        .preview-chip-success {
+            background: #d7f0df;
+            color: #17613c;
+        }
+
+        .preview-chip-danger {
+            background: #f8d8d5;
+            color: #9d3d2a;
+        }
+
+        .preview-chip-info {
+            background: #dceef5;
+            color: #0b557e;
         }
 
         .helper-text {
@@ -1588,10 +1666,17 @@
             background: #e8f1f4;
         }
 
+        .btn.btn-primary {
+            background: #0e648f;
+            color: #fff;
+            box-shadow: 0 10px 20px rgba(14, 100, 143, 0.18);
+        }
+
         .btn:hover {
             background: #dcebee;
         }
 
+        .btn.btn-primary:hover,
         .btn-primary:hover {
             background: #08476c;
         }
@@ -2244,6 +2329,12 @@
                                         <input type="checkbox" id="comparisonAdditionsOnly" onchange="updateComparisonOption('additionsOnly', this.checked)">
                                     </div>
                                 </div>
+                                <div class="field-full">
+                                    <div class="toggle-row">
+                                        <span>Use <strong>Lazada short RPC</strong> comparison for Change Detection groups</span>
+                                        <input type="checkbox" id="comparisonLazadaMode" onchange="updateComparisonOption('compareForLazada', this.checked)">
+                                    </div>
+                                </div>
                             </div>
                             <div class="config-actions">
                                 <button class="btn btn-subtle" type="button" onclick="initializeComparisonState()">Load Headers</button>
@@ -2253,7 +2344,7 @@
                         </div>
                         <div class="subsection">
                             <div class="subsection-title">Change Detection</div>
-                            <div class="subsection-copy">Configure retailer groups to find additions and removals, then prepare operations outputs and internal notes.</div>
+                            <div class="subsection-copy">Configure retailer groups to find additions and removals. Turn on Lazada short RPC comparison for groups where the client file uses the short identifier before "_".</div>
                             <div id="comparisonConfigList" class="config-list"></div>
                             <div class="action-lane">
                                 <div class="action-lane-title">Exports</div>
@@ -2261,14 +2352,6 @@
                                     <button class="btn btn-primary" onclick="processClientComparison()">Export Add / Remove</button>
                                     <button class="btn" onclick="exportClientCoverageCheck()">Client Coverage Check</button>
                                     <button class="btn" onclick="previewClientComparison()">Preview</button>
-                                    <button class="btn" onclick="exportGoogleSheetReady()">Google Sheet Ready</button>
-                                </div>
-                            </div>
-                            <div class="action-lane">
-                                <div class="action-lane-title">Operations Notes</div>
-                                <div class="actions">
-                                    <button class="btn" onclick="generateJiraDraft()">Jira Draft</button>
-                                    <button class="btn" onclick="showReviewCases()">Review Cases</button>
                                 </div>
                             </div>
                         </div>
@@ -2406,7 +2489,8 @@
             groups: [],
             options: {
                 includeCompetitor: false,
-                additionsOnly: false
+                additionsOnly: false,
+                compareForLazada: false
             },
             lookupConfig: {
                 clientSheet: '',
@@ -2548,6 +2632,51 @@
         function showPreview(element, html) {
             element.innerHTML = html;
             element.classList.add('show');
+        }
+
+        function formatPreviewCell(value, header = '') {
+            const text = String(value ?? '');
+            const lower = text.toLowerCase();
+            const isStatusHeader = /status|result/i.test(String(header));
+            if (isStatusHeader && ['add', 'remove', 'tracked', 'existing', 'matched', 'exist'].includes(lower)) {
+                return `<span class="preview-chip preview-chip-success">${escapeHtml(text)}</span>`;
+            }
+            if (isStatusHeader && (lower.includes('not found') || lower.includes('not tracked') || lower === 'not found')) {
+                return `<span class="preview-chip preview-chip-danger">${escapeHtml(text)}</span>`;
+            }
+            if (isStatusHeader && text) {
+                return `<span class="preview-chip preview-chip-info">${escapeHtml(text)}</span>`;
+            }
+            return escapeHtml(text);
+        }
+
+        function renderPreviewTable(title, headers, rows, limit = 30) {
+            const visibleRows = rows.slice(0, limit);
+            const body = visibleRows.length
+                ? visibleRows.map((row) => `
+                    <tr>
+                        ${headers.map((header) => `<td>${formatPreviewCell(row[header], header)}</td>`).join('')}
+                    </tr>
+                `).join('')
+                : `<tr><td colspan="${Math.max(headers.length, 1)}">No rows to preview.</td></tr>`;
+            const moreText = rows.length > limit ? `<div class="helper-text">${rows.length - limit} more row(s) are available in export.</div>` : '';
+            return `
+                <div class="preview-title">${escapeHtml(title)}</div>
+                <div class="preview-table-wrap">
+                    <table class="preview-table">
+                        <thead><tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join('')}</tr></thead>
+                        <tbody>${body}</tbody>
+                    </table>
+                </div>
+                ${moreText}
+            `;
+        }
+
+        function prioritizePreviewHeaders(headers, priorityHeaders = [], limit = 12) {
+            const available = new Set(headers);
+            const prioritized = priorityHeaders.filter((header) => available.has(header));
+            const rest = headers.filter((header) => !prioritized.includes(header));
+            return [...prioritized, ...rest].slice(0, limit);
         }
 
         function hidePreview(element) {
@@ -2924,6 +3053,8 @@
             document.getElementById('comparisonMasterCount').textContent = String(comparisonState.masterRows.length);
             document.getElementById('comparisonClientCount').textContent = String(comparisonState.clientRows.length);
             document.getElementById('comparisonGroupCount').textContent = String(comparisonState.groups.length);
+            const lazadaToggle = document.getElementById('comparisonLazadaMode');
+            if (lazadaToggle) lazadaToggle.checked = Boolean(comparisonState.options.compareForLazada);
         }
 
         function getComparisonScopeLabel() {
@@ -2946,6 +3077,14 @@
 
         function updateComparisonOption(field, value) {
             comparisonState.options[field] = value;
+            if (field === 'compareForLazada') {
+                comparisonState.groups.forEach((group) => {
+                    group.compareForLazada = Boolean(value);
+                });
+                renderComparisonGroups();
+                updateComparisonStats();
+                return;
+            }
             refreshComparisonMasterScope();
         }
 
@@ -2989,12 +3128,16 @@
         }
 
         function createComparisonGroup(seed = {}) {
+            const retailerName = seed.retailerName || '';
             return {
                 id: seed.id || `cmp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-                retailerName: seed.retailerName || '',
+                retailerName,
                 masterColumn: seed.masterColumn || '',
                 clientSheet: seed.clientSheet || '',
-                clientColumn: seed.clientColumn || ''
+                clientColumn: seed.clientColumn || '',
+                compareForLazada: seed.compareForLazada !== undefined
+                    ? Boolean(seed.compareForLazada)
+                    : (Boolean(comparisonState.options.compareForLazada) || /lazada/i.test(retailerName))
             };
         }
 
@@ -3055,6 +3198,12 @@
                                 ${buildSelectOptions(getClientHeadersForGroup(group), group.clientColumn, 'Choose client identifier')}
                             </select>
                         </div>
+                        <div class="field-full">
+                            <div class="toggle-row">
+                                <span>Compare for <strong>Lazada short RPC</strong> in this group</span>
+                                <input type="checkbox" ${group.compareForLazada ? 'checked' : ''} onchange="updateComparisonGroup('${group.id}', 'compareForLazada', this.checked)">
+                            </div>
+                        </div>
                     </div>
                 </div>
             `).join('');
@@ -3093,7 +3242,7 @@
             const retailerName = group.retailerName.trim() || 'Group';
             const masterMap = new Map();
             comparisonState.masterRows.forEach((row) => {
-                const identifier = normalizeComparisonIdentifier(row[group.masterColumn], retailerName);
+                const identifier = normalizeComparisonIdentifier(row[group.masterColumn], group.compareForLazada);
                 if (!identifier || masterMap.has(identifier)) return;
                 masterMap.set(identifier, row);
             });
@@ -3103,7 +3252,7 @@
             let addCount = 0;
             const clientSeen = new Set();
             clientSheetConfig.rows.forEach((row) => {
-                const identifier = normalizeComparisonIdentifier(row[group.clientColumn], retailerName);
+                const identifier = normalizeComparisonIdentifier(row[group.clientColumn], group.compareForLazada);
                 if (!identifier || clientSeen.has(identifier)) return;
                 clientSeen.add(identifier);
                 clientIdCount += 1;
@@ -3120,14 +3269,15 @@
                 clientIdCount,
                 matchedCount,
                 addCount,
-                removalCount
+                removalCount,
+                compareMode: group.compareForLazada ? 'Lazada short RPC' : 'Standard'
             };
         }
 
         function getComparisonGroupSummaryText(group) {
             const summary = getComparisonGroupSummary(group);
             if (!summary) return 'Choose the master column, client sheet, and client identifier column to see counts.';
-            return `Preview counts: identifiers ${summary.clientIdCount} | matched ${summary.matchedCount} | add ${summary.addCount} | remove ${summary.removalCount}`;
+            return `Preview counts: ${summary.compareMode} | identifiers ${summary.clientIdCount} | matched ${summary.matchedCount} | add ${summary.addCount} | remove ${summary.removalCount}`;
         }
 
         function applyRetailerSuggestion(groupId, retailerName) {
@@ -3139,6 +3289,7 @@
 
             group.retailerName = retailerName;
             group.masterColumn = getPreferredComparisonColumn(retailerConfig, 'rpc') || getPreferredComparisonColumn(retailerConfig, 'url') || group.masterColumn;
+            group.compareForLazada = /lazada/i.test(retailerName);
             renderComparisonGroups();
         }
 
@@ -3167,7 +3318,8 @@
                 comparisonState.groups.push(createComparisonGroup({
                     retailerName: retailer,
                     masterColumn: getPreferredComparisonColumn(config, 'rpc') || getPreferredComparisonColumn(config, 'url'),
-                    clientSheet: comparisonState.clientSheetNames[0] || ''
+                    clientSheet: comparisonState.clientSheetNames[0] || '',
+                    compareForLazada: /lazada/i.test(retailer)
                 }));
             });
             renderComparisonGroups();
@@ -3342,10 +3494,10 @@
             }
         }
 
-        function normalizeComparisonIdentifier(value, retailerName) {
+        function normalizeComparisonIdentifier(value, compareForLazada = false) {
             const normalized = normalizeIdentifier(value);
             if (!normalized) return '';
-            if (retailerName.toLowerCase().includes('lazada')) {
+            if (compareForLazada) {
                 const shortCode = normalized.split('_')[0];
                 return shortCode || normalized;
             }
@@ -3677,10 +3829,10 @@
             }
         }
 
-        function collectDuplicateIdentifiers(rows, columnName, retailerName, sourceLabel) {
+        function collectDuplicateIdentifiers(rows, columnName, compareForLazada, retailerName, sourceLabel) {
             const counts = new Map();
             rows.forEach((row) => {
-                const identifier = normalizeComparisonIdentifier(row[columnName], retailerName);
+                const identifier = normalizeComparisonIdentifier(row[columnName], compareForLazada);
                 if (!identifier) return;
                 counts.set(identifier, (counts.get(identifier) || 0) + 1);
             });
@@ -3692,73 +3844,6 @@
                     retailer: retailerName,
                     detail: `${identifier} appears ${count} times in ${sourceLabel.toLowerCase()} data`
                 }));
-        }
-
-        function buildSummaryRows(result) {
-            const rows = [
-                ['Metric', 'Value'],
-                ['Comparison groups', result.validGroups.length],
-                ['Comparison scope', result.comparisonScope],
-                ['Additions only mode', result.additionsOnly ? 'Yes' : 'No'],
-                ['Addition rows', result.additions.length],
-                ['Removal rows', result.removals.length],
-                ['Review cases', result.reviewCases.length],
-                ['Generated at', new Date().toLocaleString()]
-            ];
-
-            rows.push([]);
-            rows.push(['Retailer', 'Client Sheet', 'Matched', 'Add', 'Remove']);
-            result.groupSummaries.forEach((summary) => {
-                rows.push([summary.retailerName, summary.clientSheet, summary.matchedCount, summary.addCount, summary.removalCount]);
-            });
-            return rows;
-        }
-
-        function buildReviewCaseRows(reviewCases) {
-            return [
-                ['Severity', 'Type', 'Retailer', 'Detail'],
-                ...reviewCases.map((item) => [item.severity, item.type, item.retailer || '', item.detail])
-            ];
-        }
-
-        function buildJiraDraftText(result) {
-            const groupLines = result.groupSummaries.map((summary) =>
-                `- ${summary.retailerName} (${summary.clientSheet}): matched ${summary.matchedCount}, add ${summary.addCount}, remove ${summary.removalCount}`
-            ).join('\n');
-
-            const reviewLines = result.reviewCases.length
-                ? result.reviewCases.slice(0, 10).map((item) => `- [${item.severity}] ${item.type}: ${item.detail}`).join('\n')
-                : '- No review blockers detected';
-
-            return [
-                'Title: Update tracked assortment based on latest client file',
-                '',
-                'Summary:',
-                `- Comparison groups: ${result.validGroups.length}`,
-                `- Comparison scope: ${result.comparisonScope}`,
-                `- Additions only mode: ${result.additionsOnly ? 'Yes' : 'No'}`,
-                `- Addition rows: ${result.additions.length}`,
-                `- Removal rows: ${result.removals.length}`,
-                `- Review cases: ${result.reviewCases.length}`,
-                '',
-                'Retailer breakdown:',
-                groupLines || '- No configured groups',
-                '',
-                'Source files:',
-                '- Master workbook cleaned automatically before comparison',
-                result.additionsOnly ? '- Removal check skipped by additions only mode' : '- Additions and removals checked together',
-                result.comparisonScope === 'Client + Competitor'
-                    ? '- Comparison includes Client and Competitor rows from master'
-                    : '- Comparison limited to Owner = Client rows when Owner column exists',
-                '- Lazada identifiers normalized using the short code before "_"',
-                '',
-                'Review notes:',
-                reviewLines,
-                '',
-                'Requested action:',
-                '- Process additions and removals from the attached source file',
-                '- Verify flagged review cases before final database update'
-            ].join('\n');
         }
 
         function buildClientComparisonResult() {
@@ -3785,19 +3870,19 @@
                 const clientSheetConfig = comparisonState.clientSheets[group.clientSheet];
                 if (!clientSheetConfig) return;
                 reviewCases.push(
-                    ...collectDuplicateIdentifiers(comparisonState.masterRows, group.masterColumn, retailerName, 'Master'),
-                    ...collectDuplicateIdentifiers(clientSheetConfig.rows, group.clientColumn, retailerName, 'Client')
+                    ...collectDuplicateIdentifiers(comparisonState.masterRows, group.masterColumn, group.compareForLazada, retailerName, 'Master'),
+                    ...collectDuplicateIdentifiers(clientSheetConfig.rows, group.clientColumn, group.compareForLazada, retailerName, 'Client')
                 );
                 const masterMap = new Map();
                 comparisonState.masterRows.forEach((row) => {
-                    const identifier = normalizeComparisonIdentifier(row[group.masterColumn], retailerName);
+                    const identifier = normalizeComparisonIdentifier(row[group.masterColumn], group.compareForLazada);
                     if (!identifier || masterMap.has(identifier)) return;
                     masterMap.set(identifier, row);
                 });
 
                 const clientMap = new Map();
                 clientSheetConfig.rows.forEach((row) => {
-                    const identifier = normalizeComparisonIdentifier(row[group.clientColumn], retailerName);
+                    const identifier = normalizeComparisonIdentifier(row[group.clientColumn], group.compareForLazada);
                     if (!identifier || clientMap.has(identifier)) return;
                     clientMap.set(identifier, row);
                 });
@@ -3856,6 +3941,7 @@
                     clientSheet: group.clientSheet,
                     masterColumn: group.masterColumn,
                     clientColumn: group.clientColumn,
+                    compareForLazada: Boolean(group.compareForLazada),
                     matchedCount,
                     addCount,
                     removalCount
@@ -3949,14 +4035,14 @@
 
                 const masterMap = new Map();
                 comparisonState.masterRows.forEach((row) => {
-                    const identifier = normalizeComparisonIdentifier(row[group.masterColumn], retailerName);
+                    const identifier = normalizeComparisonIdentifier(row[group.masterColumn], group.compareForLazada);
                     if (!identifier || masterMap.has(identifier)) return;
                     masterMap.set(identifier, row);
                 });
 
                 const clientMap = new Map();
                 clientSheetConfig.rows.forEach((row) => {
-                    const identifier = normalizeComparisonIdentifier(row[group.clientColumn], retailerName);
+                    const identifier = normalizeComparisonIdentifier(row[group.clientColumn], group.compareForLazada);
                     if (!identifier || clientMap.has(identifier)) return;
                     clientMap.set(identifier, row);
                 });
@@ -3988,6 +4074,7 @@
                 groupSummaries.push({
                     retailerName,
                     clientSheet: group.clientSheet,
+                    compareForLazada: Boolean(group.compareForLazada),
                     existingCount,
                     notTrackedCount
                 });
@@ -4082,121 +4169,31 @@
             }
         }
 
-        async function exportGoogleSheetReady() {
-            const status = document.getElementById('statusComparison');
-
-            try {
-                showStatus(status, 'Building Google Sheet ready workbook...', 'loading');
-                const result = buildClientComparisonResult();
-                comparisonState.lastResult = result;
-
-                const workbookOut = XLSX.utils.book_new();
-                const summaryMatrix = buildSummaryRows(result);
-                const additionsMatrix = [result.additionHeaders, ...result.additions.map((row) => result.additionHeaders.map((header) => row[header] !== undefined ? row[header] : ''))];
-                const reviewMatrix = buildReviewCaseRows(result.reviewCases);
-
-                const summarySheet = XLSX.utils.aoa_to_sheet(summaryMatrix);
-                const additionsSheet = XLSX.utils.aoa_to_sheet(additionsMatrix);
-                const reviewSheet = XLSX.utils.aoa_to_sheet(reviewMatrix);
-
-                applySheetStyles(summarySheet, summaryMatrix);
-                applySheetStyles(additionsSheet, additionsMatrix);
-                applySheetStyles(reviewSheet, reviewMatrix);
-                applyStatusCellColors(additionsSheet, additionsMatrix, result.additionStatusHeaders);
-
-                XLSX.utils.book_append_sheet(workbookOut, summarySheet, 'Summary');
-                XLSX.utils.book_append_sheet(workbookOut, additionsSheet, 'Additions');
-                if (!result.additionsOnly) {
-                    const removalsMatrix = [result.removalHeaders, ...result.removals.map((row) => result.removalHeaders.map((header) => row[header] !== undefined ? row[header] : ''))];
-                    const removalsSheet = XLSX.utils.aoa_to_sheet(removalsMatrix);
-                    applySheetStyles(removalsSheet, removalsMatrix);
-                    applyStatusCellColors(removalsSheet, removalsMatrix, result.removalStatusHeaders);
-                    XLSX.utils.book_append_sheet(workbookOut, removalsSheet, 'Removals');
-                }
-                XLSX.utils.book_append_sheet(workbookOut, reviewSheet, 'Review Cases');
-                XLSX.writeFile(workbookOut, 'google_sheet_ready_comparison.xlsx');
-
-                showStatus(status, result.additionsOnly ? 'Google Sheet ready export complete. Summary, additions, and review cases were written.' : 'Google Sheet ready export complete. Summary, additions, removals, and review cases were written.', 'success');
-            } catch (error) {
-                showStatus(status, `Error: ${error.message}`, 'error');
-            }
-        }
-
-        async function generateJiraDraft() {
-            const preview = document.getElementById('previewComparison');
-
-            try {
-                const result = buildClientComparisonResult();
-                comparisonState.lastResult = result;
-                const draft = buildJiraDraftText(result);
-                if (navigator.clipboard && navigator.clipboard.writeText) {
-                    navigator.clipboard.writeText(draft).catch(() => {});
-                }
-                showPreview(
-                    preview,
-                    `<div class="preview-title">Jira draft</div><div class="preview-row"><pre style="white-space: pre-wrap; font: inherit;">${escapeHtml(draft)}</pre></div>`
-                );
-            } catch (error) {
-                showPreview(preview, `<div class="preview-title">Jira draft error</div><div class="preview-row">${escapeHtml(error.message)}</div>`);
-            }
-        }
-
-        async function showReviewCases() {
-            const preview = document.getElementById('previewComparison');
-
-            try {
-                const result = buildClientComparisonResult();
-                comparisonState.lastResult = result;
-                const content = result.reviewCases.length
-                    ? result.reviewCases.map((item, index) => `
-                        <div class="preview-row">
-                            <strong>Case ${index + 1}</strong><br>
-                            [${escapeHtml(item.severity)}] ${escapeHtml(item.type)}<br>
-                            ${escapeHtml(item.detail)}
-                        </div>
-                    `).join('')
-                    : '<div class="preview-row">No review cases detected.</div>';
-                showPreview(preview, `<div class="preview-title">Review cases</div>${content}`);
-            } catch (error) {
-                showPreview(preview, `<div class="preview-title">Review cases error</div><div class="preview-row">${escapeHtml(error.message)}</div>`);
-            }
-        }
-
         async function previewClientComparison() {
             const preview = document.getElementById('previewComparison');
 
             try {
                 const result = buildClientComparisonResult();
                 comparisonState.lastResult = result;
-                const groupPreview = result.groupSummaries.map((summary) => `
-                    <div class="preview-row">
-                        <strong>${escapeHtml(summary.retailerName)}</strong><br>
-                        Sheet: ${escapeHtml(summary.clientSheet)}<br>
-                        Matched: ${summary.matchedCount} | Add: ${summary.addCount} | Remove: ${summary.removalCount}
-                    </div>
-                `).join('');
-                const additionPreview = result.additions.slice(0, 3).map((row, index) => `
-                    <div class="preview-row">
-                        <strong>Addition ${index + 1}</strong><br>
-                        Sheet: ${escapeHtml(row['Client Sheet'])}<br>
-                        Existing Profitero URL: ${escapeHtml(row['Existing Profitero URL'] || '')}
-                    </div>
-                `).join('');
-                const removalPreview = result.removals.slice(0, 3).map((row, index) => `
-                    <div class="preview-row">
-                        <strong>Removal ${index + 1}</strong><br>
-                        Sheet: ${escapeHtml(row['Client Sheet'])}<br>
-                        ${escapeHtml(result.removalHeaders.slice(0, 3).map((header) => `${header}: ${row[header] ?? ''}`).join(' | '))}
-                    </div>
-                `).join('');
+                const groupHeaders = ['Retailer', 'Client Sheet', 'Match Mode', 'Matched', 'Add', 'Remove'];
+                const groupRows = result.groupSummaries.map((summary) => ({
+                    'Retailer': summary.retailerName,
+                    'Client Sheet': summary.clientSheet,
+                    'Match Mode': summary.compareForLazada ? 'Lazada short RPC' : 'Standard',
+                    'Matched': summary.matchedCount,
+                    'Add': summary.addCount,
+                    'Remove': summary.removalCount
+                }));
+                const additionHeaders = prioritizePreviewHeaders(result.additionHeaders, ['Existing Profitero URL', 'Client Sheet', ...result.additionStatusHeaders]);
+                const removalHeaders = prioritizePreviewHeaders(result.removalHeaders, ['Client Sheet', ...result.removalStatusHeaders]);
 
                 showPreview(
                     preview,
                     `<div class="preview-title">Comparison preview</div>
                      <div class="preview-row">Scope: ${escapeHtml(result.comparisonScope)} | Groups: ${result.validGroups.length} | Additions: ${result.additions.length} | Removals: ${result.removals.length}${result.additionsOnly ? ' | Additions only mode' : ''}</div>
-                     ${groupPreview}
-                     ${additionPreview || '<div class="preview-row">No additions found.</div>'}
-                     ${result.additionsOnly ? '<div class="preview-row">Removal check is skipped in additions only mode.</div>' : (removalPreview || '<div class="preview-row">No removals found.</div>')}`
+                     ${renderPreviewTable('Group Summary', groupHeaders, groupRows)}
+                     ${renderPreviewTable('Additions Preview', additionHeaders, result.additions)}
+                     ${result.additionsOnly ? '<div class="preview-row">Removal check is skipped in additions only mode.</div>' : renderPreviewTable('Removals Preview', removalHeaders, result.removals)}`
                 );
             } catch (error) {
                 showPreview(preview, `<div class="preview-title">Preview error</div><div class="preview-row">${escapeHtml(error.message)}</div>`);
@@ -4565,27 +4562,16 @@
             try {
                 const result = buildIndexMatchResult();
                 getIndexMatchState().lastResult = result;
-                const masterSample = result.masterRows.slice(0, 3).map((row, index) => `
-                    <div class="preview-row">
-                        <strong>Master Row ${index + 1}</strong><br>
-                        Identifier: ${escapeHtml(row[result.config.masterColumn] ?? '')}<br>
-                        Check Result: ${escapeHtml(row['Check Result'])}
-                    </div>
-                `).join('');
-                const clientSample = result.clientRows.slice(0, 3).map((row, index) => `
-                    <div class="preview-row">
-                        <strong>Client Row ${index + 1}</strong><br>
-                        Identifier: ${escapeHtml(row[result.config.clientColumn] ?? '')}<br>
-                        Check Result: ${escapeHtml(row['Check Result'])}
-                    </div>
-                `).join('');
+                const masterHeaders = prioritizePreviewHeaders(result.masterHeaders, ['Check Result', result.config.masterColumn]);
+                const clientHeaders = prioritizePreviewHeaders(result.clientHeaders, ['Check Result', result.config.clientColumn]);
                 showPreview(
                     preview,
                     `<div class="preview-title">Index Match preview</div>
                      <div class="preview-row">Mode: ${result.compareForLazada ? 'Lazada short version' : 'Standard'}<br>
                      Master exist: ${result.masterCounts.exist || 0} | Not found in client file: ${result.masterCounts['not found in client file'] || 0}<br>
                      Client exist: ${result.clientCounts.exist || 0} | Not found in master file: ${result.clientCounts['not found in master file'] || 0}</div>
-                     ${masterSample}${clientSample}`
+                     ${renderPreviewTable('Master Check Preview', masterHeaders, result.masterRows)}
+                     ${renderPreviewTable('Client Check Preview', clientHeaders, result.clientRows)}`
                 );
             } catch (error) {
                 showPreview(preview, `<div class="preview-title">Index Match error</div><div class="preview-row">${escapeHtml(error.message)}</div>`);
