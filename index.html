@@ -2065,7 +2065,7 @@
                     <div class="feature-list">
                         <div class="feature-badge">Column cleanup</div>
                         <div class="feature-badge">Header normalization</div>
-                        <div class="feature-badge">Keyword sheet retained</div>
+                        <div class="feature-badge">Keyword & content sheets</div>
                     </div>
                     <div class="panel">
                         <div class="field-full">
@@ -2084,6 +2084,12 @@
                                 <div class="toggle-row">
                                     <span>Keep only product rows where <strong>Owner = Client</strong></span>
                                     <input type="checkbox" id="basicCleanupOwnerClientOnly">
+                                </div>
+                            </div>
+                            <div class="field-full">
+                                <div class="toggle-row">
+                                    <span>Include cleaned <strong>Content</strong> sheet from <strong>Product Content</strong></span>
+                                    <input type="checkbox" id="basicCleanupIncludeContent">
                                 </div>
                             </div>
                             <div class="field-full">
@@ -3451,9 +3457,74 @@
         function getBasicCleanupOptions() {
             return {
                 keepKeywords: document.getElementById('basicCleanupKeepKeywords').checked,
+                includeContent: document.getElementById('basicCleanupIncludeContent').checked,
                 ownerClientOnly: document.getElementById('basicCleanupOwnerClientOnly').checked,
                 hideProfiteroColumns: document.getElementById('basicCleanupHideProfitero').checked
             };
+        }
+
+        function getNonEmptySheetMatrix(worksheet) {
+            return getWorksheetMatrix(worksheet)
+                .filter((row) => row.some((cell) => !isEmptyCell(cell)));
+        }
+
+        function buildContentSheetMatrix(workbook) {
+            const sheetName = workbook.SheetNames.find((name) => String(name).trim().toLowerCase() === 'product content')
+                || findOptionalSheetName(workbook, ['product content']);
+            if (!sheetName || !workbook.Sheets[sheetName]) {
+                throw new Error('Product Content sheet was not found');
+            }
+
+            const sourceMatrix = getNonEmptySheetMatrix(workbook.Sheets[sheetName]);
+            if (!sourceMatrix.length) throw new Error('Product Content sheet is empty');
+
+            const requiredHeaders = ['Field Name', 'Critical', 'EVraw'];
+            const sourceHeaders = sourceMatrix[0].map((header) => String(header ?? '').trim());
+            const sourceIndices = requiredHeaders.map((requiredHeader) =>
+                sourceHeaders.findIndex((header) => header.toLowerCase() === requiredHeader.toLowerCase())
+            );
+            const missingHeaders = requiredHeaders.filter((_, index) => sourceIndices[index] === -1);
+            if (missingHeaders.length) {
+                throw new Error(`Product Content is missing required column(s): ${missingHeaders.join(', ')}`);
+            }
+
+            const rows = sourceMatrix.slice(1)
+                .map((row) => sourceIndices.map((sourceIndex) => row[sourceIndex] ?? ''))
+                .filter((row) => row.some((cell) => !isEmptyCell(cell)));
+            return [requiredHeaders, ...rows];
+        }
+
+        function applyCleanupSheetStyles(worksheet, matrix) {
+            applySheetStyles(worksheet, matrix);
+            if (!worksheet['!ref'] || !matrix.length) return;
+
+            const range = XLSX.utils.decode_range(worksheet['!ref']);
+            worksheet['!autofilter'] = { ref: XLSX.utils.encode_range(range) };
+            worksheet['!freeze'] = {
+                xSplit: '0',
+                ySplit: '1',
+                topLeftCell: 'A2',
+                activePane: 'bottomLeft',
+                state: 'frozen'
+            };
+            worksheet['!rows'] = matrix.map((row, rowIndex) => {
+                if (rowIndex === 0) return { hpt: 30 };
+                const longestValue = row.reduce((max, value) => Math.max(max, String(value ?? '').length), 0);
+                return { hpt: longestValue > 100 ? 42 : (longestValue > 50 ? 30 : 22) };
+            });
+
+            for (let rowIndex = 1; rowIndex <= range.e.r; rowIndex += 1) {
+                for (let columnIndex = range.s.c; columnIndex <= range.e.c; columnIndex += 1) {
+                    const address = XLSX.utils.encode_cell({ r: rowIndex, c: columnIndex });
+                    if (!worksheet[address]) continue;
+                    worksheet[address].s = worksheet[address].s || {};
+                    worksheet[address].s.alignment = {
+                        ...(worksheet[address].s.alignment || {}),
+                        vertical: 'top',
+                        wrapText: true
+                    };
+                }
+            }
         }
 
         function applyProfiteroViewSettings(worksheet, headers, enabled) {
@@ -5714,19 +5785,32 @@
                 const workbookOut = XLSX.utils.book_new();
                 const matrix = [headers, ...filteredRows.map((row) => headers.map((header) => row[header] !== undefined ? row[header] : ''))];
                 const worksheetOut = XLSX.utils.aoa_to_sheet(matrix);
-                applySheetStyles(worksheetOut, matrix);
+                applyCleanupSheetStyles(worksheetOut, matrix);
                 applyProfiteroViewSettings(worksheetOut, headers, options.hideProfiteroColumns);
                 XLSX.utils.book_append_sheet(workbookOut, worksheetOut, 'Products');
 
+                let keywordRowCount = 0;
                 if (options.keepKeywords && keywordSheetName && workbook.Sheets[keywordSheetName]) {
-                    const keywordRows = XLSX.utils.sheet_to_json(workbook.Sheets[keywordSheetName], { defval: '' });
-                    if (keywordRows.length) {
-                        XLSX.utils.book_append_sheet(workbookOut, XLSX.utils.json_to_sheet(keywordRows), 'Keywords');
+                    const keywordMatrix = getNonEmptySheetMatrix(workbook.Sheets[keywordSheetName]);
+                    if (keywordMatrix.length) {
+                        const keywordSheet = XLSX.utils.aoa_to_sheet(keywordMatrix);
+                        applyCleanupSheetStyles(keywordSheet, keywordMatrix);
+                        XLSX.utils.book_append_sheet(workbookOut, keywordSheet, 'Keywords');
+                        keywordRowCount = Math.max(0, keywordMatrix.length - 1);
                     }
                 }
 
+                let contentRowCount = 0;
+                if (options.includeContent) {
+                    const contentMatrix = buildContentSheetMatrix(workbook);
+                    const contentSheet = XLSX.utils.aoa_to_sheet(contentMatrix);
+                    applyCleanupSheetStyles(contentSheet, contentMatrix);
+                    XLSX.utils.book_append_sheet(workbookOut, contentSheet, 'Content');
+                    contentRowCount = Math.max(0, contentMatrix.length - 1);
+                }
+
                 XLSX.writeFile(workbookOut, 'master_list_cleaned.xlsx');
-                showStatus(status, `Export complete. ${filteredRows.length} cleaned rows were written.${options.ownerClientOnly ? ' Owner = Client filter applied.' : ''}${options.keepKeywords ? ' Keywords sheet kept.' : ' Keywords sheet excluded.'}`, 'success');
+                showStatus(status, `Export complete. ${filteredRows.length} cleaned product rows were written.${options.ownerClientOnly ? ' Owner = Client filter applied.' : ''}${options.keepKeywords ? ` Keywords: ${keywordRowCount} rows.` : ' Keywords sheet excluded.'}${options.includeContent ? ` Content: ${contentRowCount} rows with Field Name, Critical, and EVraw.` : ' Content sheet excluded.'}`, 'success');
             } catch (error) {
                 showStatus(status, `Error: ${error.message}`, 'error');
             }
@@ -5739,15 +5823,20 @@
                 const options = getBasicCleanupOptions();
                 const workbook = await readWorkbookFromInput(document.getElementById('basicCleanupFile'));
                 const productSheetName = findBestSheetName(workbook, ['product list', 'master', 'products']);
+                const keywordSheetName = findOptionalSheetName(workbook, ['search terms', 'keywords']);
                 const worksheet = workbook.Sheets[productSheetName];
                 const { headers, data } = processWorksheetData(worksheet, COLUMNS_TO_DROP);
                 const contentRows = filterRowsWithContent(data, headers);
                 const filteredRows = filterRowsByOwnerClient(contentRows, headers, options.ownerClientOnly);
+                const keywordMatrix = options.keepKeywords && keywordSheetName && workbook.Sheets[keywordSheetName]
+                    ? getNonEmptySheetMatrix(workbook.Sheets[keywordSheetName])
+                    : [];
+                const contentMatrix = options.includeContent ? buildContentSheetMatrix(workbook) : [];
                 const sampleRows = filteredRows.slice(0, 5).map((row, index) => `
                     <div class="preview-row"><strong>Row ${index + 1}</strong><br>${escapeHtml(headers.map((header) => `${header}: ${row[header] ?? ''}`).join(' | '))}</div>
                 `).join('');
 
-                showPreview(preview, `<div class="preview-title">Preview of cleaned product rows</div><div class="preview-row">Rows after cleanup: ${filteredRows.length}${options.ownerClientOnly ? ' | Owner = Client only' : ''}${options.keepKeywords ? ' | Keywords sheet will be kept' : ' | Products sheet only'}</div>${sampleRows || '<div class="preview-row">No rows remain after cleanup.</div>'}`);
+                showPreview(preview, `<div class="preview-title">Preview of cleaned master workbook</div><div class="preview-row">Products: ${filteredRows.length} rows${options.ownerClientOnly ? ' | Owner = Client only' : ''}<br>Keywords: ${options.keepKeywords ? `${Math.max(0, keywordMatrix.length - 1)} rows` : 'excluded'}<br>Content: ${options.includeContent ? `${Math.max(0, contentMatrix.length - 1)} rows | Field Name, Critical, EVraw` : 'excluded'}</div>${sampleRows || '<div class="preview-row">No product rows remain after cleanup.</div>'}`);
             } catch (error) {
                 showPreview(preview, `<div class="preview-title">Preview error</div><div class="preview-row">${escapeHtml(error.message)}</div>`);
             }
