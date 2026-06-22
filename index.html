@@ -2363,7 +2363,7 @@
                         </div>
                         <div class="subsection">
                             <div class="subsection-title">Master Lookup Enrichment</div>
-                            <div class="subsection-copy">Use one client column as the lookup key, search one or more master columns, and merge selected master values back into the client file. Rows without a match are marked as not found.</div>
+                            <div class="subsection-copy">Keep the client workbook structure and append selected master values to the chosen client sheet. Use the Lazada toggle when the client Product ID is the short code before "_".</div>
                             <div class="field-grid">
                                 <div class="field">
                                     <label>Client sheet</label>
@@ -2378,7 +2378,13 @@
                                     <div id="lookupMasterMatchColumns" class="checklist-box"></div>
                                 </div>
                                 <div class="field-full">
-                                    <label>Master output columns</label>
+                                    <div class="toggle-row">
+                                        <span>Compare using <strong>Lazada short Product ID</strong></span>
+                                        <input type="checkbox" id="lookupCompareForLazada" onchange="updateLookupConfig('compareForLazada', this.checked)">
+                                    </div>
+                                </div>
+                                <div class="field-full">
+                                    <label>Master columns to append to client sheet</label>
                                     <div id="lookupMasterOutputColumns" class="checklist-box"></div>
                                 </div>
                             </div>
@@ -2502,7 +2508,8 @@
                 clientSheet: '',
                 clientColumn: '',
                 masterMatchColumns: new Set(),
-                masterOutputColumns: new Set()
+                masterOutputColumns: new Set(),
+                compareForLazada: false
             },
             indexMatch: {
                 masterWorkbook: null,
@@ -3096,7 +3103,27 @@
 
         function updateLookupConfig(field, value) {
             comparisonState.lookupConfig[field] = value;
+            if (field === 'clientSheet') applyLookupDefaultsForSheet(value);
             renderLookupControls();
+        }
+
+        function getSuggestedLookupMasterColumns(sheetName) {
+            const lowerSheetName = String(sheetName || '').toLowerCase();
+            let retailerPattern = null;
+            if (/lazada|\blzd\b/.test(lowerSheetName)) retailerPattern = /lazada/i;
+            if (/shopee|\bshp\b/.test(lowerSheetName)) retailerPattern = /shopee/i;
+            const rpcColumns = comparisonState.masterHeaders.filter((header) => /^\s*rpc\b/i.test(String(header)));
+            if (!retailerPattern) return rpcColumns.slice(0, 1);
+            return rpcColumns.filter((header) => retailerPattern.test(String(header))).slice(0, 1);
+        }
+
+        function applyLookupDefaultsForSheet(sheetName) {
+            const config = comparisonState.lookupConfig;
+            const sheet = comparisonState.clientSheets[sheetName];
+            const lowerSheetName = String(sheetName || '').toLowerCase();
+            config.clientColumn = sheet ? getPreferredIdentifierColumn(sheet.headers) : '';
+            config.compareForLazada = /lazada|\blzd\b/.test(lowerSheetName);
+            config.masterMatchColumns = new Set(getSuggestedLookupMasterColumns(sheetName));
         }
 
         function toggleLookupSet(field, value, checked) {
@@ -3129,6 +3156,7 @@
                 : [];
             document.getElementById('lookupClientSheet').innerHTML = buildSelectOptions(sheetNames, clientSheet, 'Choose client sheet');
             document.getElementById('lookupClientColumn').innerHTML = buildSelectOptions(clientHeaders, comparisonState.lookupConfig.clientColumn, 'Choose client identifier');
+            document.getElementById('lookupCompareForLazada').checked = Boolean(comparisonState.lookupConfig.compareForLazada);
             renderChecklist('lookupMasterMatchColumns', comparisonState.masterHeaders, comparisonState.lookupConfig.masterMatchColumns, 'masterMatchColumns');
             renderChecklist('lookupMasterOutputColumns', comparisonState.masterHeaders, comparisonState.lookupConfig.masterOutputColumns, 'masterOutputColumns');
         }
@@ -3407,8 +3435,12 @@
                         : (clientSheetNames[0] || ''),
                     clientColumn: '',
                     masterMatchColumns: new Set(),
-                    masterOutputColumns: new Set()
+                    masterOutputColumns: new Set(
+                        masterProcessed.headers.filter((header) => String(header).trim().toLowerCase() === 'profitero url').slice(0, 1)
+                    ),
+                    compareForLazada: false
                 };
+                applyLookupDefaultsForSheet(comparisonState.lookupConfig.clientSheet);
 
                 if (!comparisonState.groups.length) {
                     comparisonState.groups = [createComparisonGroup({ clientSheet: clientSheetNames[0] || '' })];
@@ -4271,6 +4303,12 @@
             }
         }
 
+        function normalizeLookupIdentifier(value, compareForLazada) {
+            const normalized = normalizeIdentifier(value);
+            if (!normalized) return '';
+            return compareForLazada ? (normalized.split('_')[0] || normalized) : normalized;
+        }
+
         function buildMasterLookupResult() {
             if (!comparisonState.masterRows.length || !comparisonState.clientRows.length) {
                 throw new Error('Please load both master and client files first');
@@ -4294,10 +4332,14 @@
 
             const matchColumns = Array.from(config.masterMatchColumns);
             const outputColumns = Array.from(config.masterOutputColumns);
+            const outputDefinitions = outputColumns.map((column) => ({
+                sourceColumn: column,
+                outputHeader: clientSheetConfig.headers.includes(column) ? `Master ${column}` : column
+            }));
             const lookupMaps = matchColumns.map((column) => {
                 const map = new Map();
                 comparisonState.masterRows.forEach((row) => {
-                    const identifier = normalizeVerificationIdentifier(row[column], column);
+                    const identifier = normalizeLookupIdentifier(row[column], config.compareForLazada);
                     if (!identifier || map.has(identifier)) return;
                     map.set(identifier, row);
                 });
@@ -4305,7 +4347,7 @@
             });
 
             const resultRows = clientSheetConfig.rows.map((clientRow) => {
-                const identifier = normalizeIdentifier(clientRow[config.clientColumn]);
+                const identifier = normalizeLookupIdentifier(clientRow[config.clientColumn], config.compareForLazada);
                 let matchedRow = null;
                 let matchedColumn = '';
                 if (identifier) {
@@ -4319,53 +4361,37 @@
                     }
                 }
 
-                const row = {
-                    'Lookup Status': matchedRow ? 'Matched' : 'Not Found',
-                    'Lookup Matched Column': matchedColumn || '',
-                    'Lookup Identifier': clientRow[config.clientColumn] ?? ''
-                };
-                outputColumns.forEach((column) => {
-                    row[`Master ${column}`] = matchedRow ? (matchedRow[column] ?? '') : '';
-                });
+                const row = {};
                 clientSheetConfig.headers.forEach((header) => {
                     row[header] = clientRow[header] ?? '';
                 });
+                outputDefinitions.forEach(({ sourceColumn, outputHeader }) => {
+                    row[outputHeader] = matchedRow ? (matchedRow[sourceColumn] ?? '') : '';
+                });
+                row.__lookupStatus = matchedRow ? 'Matched' : 'Not Found';
+                row.__lookupMatchedColumn = matchedColumn || '';
+                row.__lookupIdentifier = clientRow[config.clientColumn] ?? '';
                 return row;
             });
 
             const headers = [
-                'Lookup Status',
-                'Lookup Matched Column',
-                'Lookup Identifier',
-                ...outputColumns.map((column) => `Master ${column}`),
-                ...clientSheetConfig.headers
+                ...clientSheetConfig.headers,
+                ...outputDefinitions.map(({ outputHeader }) => outputHeader)
             ];
 
             const counts = resultRows.reduce((acc, row) => {
-                acc[row['Lookup Status']] = (acc[row['Lookup Status']] || 0) + 1;
+                acc[row.__lookupStatus] = (acc[row.__lookupStatus] || 0) + 1;
                 return acc;
             }, {});
 
             return {
+                clientSheet: config.clientSheet,
                 headers,
                 rows: resultRows,
-                counts
+                counts,
+                outputDefinitions,
+                compareForLazada: Boolean(config.compareForLazada)
             };
-        }
-
-        function applyLookupStatusColors(worksheet, matrix) {
-            const statusIndex = matrix[0].indexOf('Lookup Status');
-            if (statusIndex === -1) return;
-            for (let rowIndex = 1; rowIndex < matrix.length; rowIndex += 1) {
-                const value = String(matrix[rowIndex][statusIndex] ?? '').toLowerCase();
-                if (!value) continue;
-                const cellAddress = XLSX.utils.encode_cell({ r: rowIndex, c: statusIndex });
-                if (!worksheet[cellAddress]) continue;
-                worksheet[cellAddress].s = worksheet[cellAddress].s || {};
-                worksheet[cellAddress].s.font = { bold: true, color: { rgb: '1F1F1F' } };
-                if (value === 'matched') worksheet[cellAddress].s.fill = { fgColor: { rgb: 'CDEFD8' } };
-                if (value === 'not found') worksheet[cellAddress].s.fill = { fgColor: { rgb: 'F6D1CF' } };
-            }
         }
 
         async function processMasterLookup() {
@@ -4373,14 +4399,19 @@
             try {
                 showStatus(status, 'Looking up client rows against selected master columns...', 'loading');
                 const result = buildMasterLookupResult();
-                const matrix = [result.headers, ...result.rows.map((row) => result.headers.map((header) => row[header] !== undefined ? row[header] : ''))];
                 const workbookOut = XLSX.utils.book_new();
-                const worksheetOut = XLSX.utils.aoa_to_sheet(matrix);
-                applySheetStyles(worksheetOut, matrix);
-                applyLookupStatusColors(worksheetOut, matrix);
-                XLSX.utils.book_append_sheet(workbookOut, worksheetOut, 'Master Lookup');
-                XLSX.writeFile(workbookOut, 'master_lookup_enrichment.xlsx');
-                showStatus(status, `Lookup export complete. Matched: ${result.counts['Matched'] || 0}. Not Found: ${result.counts['Not Found'] || 0}.`, 'success');
+                comparisonState.clientSheetNames.forEach((sheetName) => {
+                    const sheetConfig = comparisonState.clientSheets[sheetName];
+                    const isSelectedSheet = sheetName === result.clientSheet;
+                    const headers = isSelectedSheet ? result.headers : sheetConfig.headers;
+                    const rows = isSelectedSheet ? result.rows : sheetConfig.rows;
+                    const matrix = [headers, ...rows.map((row) => headers.map((header) => row[header] !== undefined ? row[header] : ''))];
+                    const worksheetOut = XLSX.utils.aoa_to_sheet(matrix);
+                    applySheetStyles(worksheetOut, matrix);
+                    XLSX.utils.book_append_sheet(workbookOut, worksheetOut, sheetName.substring(0, 31));
+                });
+                XLSX.writeFile(workbookOut, 'client_file_enriched.xlsx');
+                showStatus(status, `Client workbook export complete. ${result.outputDefinitions.length} master column(s) appended to ${escapeHtml(result.clientSheet)}. Matched: ${result.counts['Matched'] || 0}. Not Found: ${result.counts['Not Found'] || 0}.`, 'success');
             } catch (error) {
                 showStatus(status, `Error: ${error.message}`, 'error');
             }
@@ -4390,15 +4421,18 @@
             const preview = document.getElementById('previewComparison');
             try {
                 const result = buildMasterLookupResult();
-                const rows = result.rows.slice(0, 5).map((row, index) => `
-                    <div class="preview-row">
-                        <strong>Lookup Row ${index + 1}</strong><br>
-                        Status: ${escapeHtml(row['Lookup Status'])}<br>
-                        Identifier: ${escapeHtml(row['Lookup Identifier'])}<br>
-                        Matched Column: ${escapeHtml(row['Lookup Matched Column'] || '')}
-                    </div>
-                `).join('');
-                showPreview(preview, `<div class="preview-title">Master lookup preview</div><div class="preview-row">Matched: ${result.counts['Matched'] || 0} | Not Found: ${result.counts['Not Found'] || 0}</div>${rows}`);
+                const previewHeaders = [
+                    'Lookup Status',
+                    comparisonState.lookupConfig.clientColumn,
+                    ...result.outputDefinitions.map(({ outputHeader }) => outputHeader),
+                    'Matched Master Column'
+                ];
+                const previewRows = result.rows.map((row) => ({
+                    ...row,
+                    'Lookup Status': row.__lookupStatus,
+                    'Matched Master Column': row.__lookupMatchedColumn
+                }));
+                showPreview(preview, `<div class="preview-title">Master lookup preview</div><div class="preview-row">Sheet: ${escapeHtml(result.clientSheet)} | Mode: ${result.compareForLazada ? 'Lazada short Product ID' : 'Standard'} | Matched: ${result.counts['Matched'] || 0} | Not Found: ${result.counts['Not Found'] || 0}</div>${renderPreviewTable('Client rows with appended master values', previewHeaders, previewRows)}`);
             } catch (error) {
                 showPreview(preview, `<div class="preview-title">Master lookup error</div><div class="preview-row">${escapeHtml(error.message)}</div>`);
             }
