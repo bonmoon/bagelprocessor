@@ -2363,31 +2363,12 @@
                         </div>
                         <div class="subsection">
                             <div class="subsection-title">Master Lookup Enrichment</div>
-                            <div class="subsection-copy">Keep the client workbook structure and append selected master values to the chosen client sheet. Use the Lazada toggle when the client Product ID is the short code before "_".</div>
-                            <div class="field-grid">
-                                <div class="field">
-                                    <label>Client sheet</label>
-                                    <select class="select-input" id="lookupClientSheet" onchange="updateLookupConfig('clientSheet', this.value)"></select>
-                                </div>
-                                <div class="field">
-                                    <label>Client identifier column</label>
-                                    <select class="select-input" id="lookupClientColumn" onchange="updateLookupConfig('clientColumn', this.value)"></select>
-                                </div>
-                                <div class="field-full">
-                                    <label>Master match columns</label>
-                                    <div id="lookupMasterMatchColumns" class="checklist-box"></div>
-                                </div>
-                                <div class="field-full">
-                                    <div class="toggle-row">
-                                        <span>Compare using <strong>Lazada short Product ID</strong></span>
-                                        <input type="checkbox" id="lookupCompareForLazada" onchange="updateLookupConfig('compareForLazada', this.checked)">
-                                    </div>
-                                </div>
-                                <div class="field-full">
-                                    <label>Master columns to append to client sheet</label>
-                                    <div id="lookupMasterOutputColumns" class="checklist-box"></div>
-                                </div>
+                            <div class="subsection-copy">Add one lookup group per client sheet. Each group can use its own identifier, master match columns, appended columns, and Lazada short-ID setting.</div>
+                            <div class="config-actions">
+                                <button class="btn btn-subtle" type="button" onclick="addLookupGroup()">Add Lookup Group</button>
+                                <button class="btn btn-subtle" type="button" onclick="addLookupGroupsForAllSheets()">Add All Client Sheets</button>
                             </div>
+                            <div id="lookupConfigList" class="config-list"></div>
                             <div class="actions">
                                 <button class="btn btn-primary" onclick="processMasterLookup()">Export Lookup Result</button>
                                 <button class="btn" onclick="previewMasterLookup()">Preview</button>
@@ -2504,13 +2485,7 @@
                 additionsOnly: false,
                 compareForLazada: false
             },
-            lookupConfig: {
-                clientSheet: '',
-                clientColumn: '',
-                masterMatchColumns: new Set(),
-                masterOutputColumns: new Set(),
-                compareForLazada: false
-            },
+            lookupGroups: [],
             indexMatch: {
                 masterWorkbook: null,
                 clientWorkbook: null,
@@ -3101,12 +3076,6 @@
             refreshComparisonMasterScope();
         }
 
-        function updateLookupConfig(field, value) {
-            comparisonState.lookupConfig[field] = value;
-            if (field === 'clientSheet') applyLookupDefaultsForSheet(value);
-            renderLookupControls();
-        }
-
         function getSuggestedLookupMasterColumns(sheetName) {
             const lowerSheetName = String(sheetName || '').toLowerCase();
             let retailerPattern = null;
@@ -3117,48 +3086,129 @@
             return rpcColumns.filter((header) => retailerPattern.test(String(header))).slice(0, 1);
         }
 
-        function applyLookupDefaultsForSheet(sheetName) {
-            const config = comparisonState.lookupConfig;
-            const sheet = comparisonState.clientSheets[sheetName];
-            const lowerSheetName = String(sheetName || '').toLowerCase();
-            config.clientColumn = sheet ? getPreferredIdentifierColumn(sheet.headers) : '';
-            config.compareForLazada = /lazada|\blzd\b/.test(lowerSheetName);
-            config.masterMatchColumns = new Set(getSuggestedLookupMasterColumns(sheetName));
+        function getDefaultLookupOutputColumns() {
+            return comparisonState.masterHeaders
+                .filter((header) => String(header).trim().toLowerCase() === 'profitero url')
+                .slice(0, 1);
         }
 
-        function toggleLookupSet(field, value, checked) {
-            const set = comparisonState.lookupConfig[field];
+        function applyLookupDefaultsToGroup(group, sheetName) {
+            const sheet = comparisonState.clientSheets[sheetName];
+            const lowerSheetName = String(sheetName || '').toLowerCase();
+            group.clientSheet = sheetName;
+            group.clientColumn = sheet ? getPreferredIdentifierColumn(sheet.headers) : '';
+            group.compareForLazada = /lazada|\blzd\b/.test(lowerSheetName);
+            group.masterMatchColumns = new Set(getSuggestedLookupMasterColumns(sheetName));
+            if (!group.masterOutputColumns.size) {
+                group.masterOutputColumns = new Set(getDefaultLookupOutputColumns());
+            }
+        }
+
+        function createLookupGroup(seed = {}) {
+            const group = {
+                id: seed.id || `lookup_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+                clientSheet: seed.clientSheet || '',
+                clientColumn: seed.clientColumn || '',
+                masterMatchColumns: new Set(seed.masterMatchColumns || []),
+                masterOutputColumns: new Set(seed.masterOutputColumns || getDefaultLookupOutputColumns()),
+                compareForLazada: Boolean(seed.compareForLazada)
+            };
+            if (group.clientSheet && !group.clientColumn) applyLookupDefaultsToGroup(group, group.clientSheet);
+            return group;
+        }
+
+        function updateLookupGroup(groupId, field, value) {
+            const group = comparisonState.lookupGroups.find((item) => item.id === groupId);
+            if (!group) return;
+            if (field === 'clientSheet') applyLookupDefaultsToGroup(group, value);
+            else group[field] = value;
+            renderLookupControls();
+        }
+
+        function toggleLookupGroupSet(groupId, field, value, checked) {
+            const group = comparisonState.lookupGroups.find((item) => item.id === groupId);
+            const set = group ? group[field] : null;
             if (!(set instanceof Set)) return;
             if (checked) set.add(value);
             else set.delete(value);
         }
 
-        function renderChecklist(containerId, options, selectedSet, field) {
-            const container = document.getElementById(containerId);
-            if (!container) return;
+        function renderLookupChecklist(groupId, options, selectedSet, field) {
             if (!options.length) {
-                container.innerHTML = '<div class="preview-row">Load files to see available columns.</div>';
-                return;
+                return '<div class="preview-row">Load files to see available columns.</div>';
             }
-            container.innerHTML = options.map((option) => `
+            return options.map((option) => `
                 <label class="option-item">
-                    <input type="checkbox" ${selectedSet.has(option) ? 'checked' : ''} onchange="toggleLookupSet('${field}', '${escapeJs(option)}', this.checked)">
+                    <input type="checkbox" ${selectedSet.has(option) ? 'checked' : ''} onchange="toggleLookupGroupSet('${groupId}', '${field}', '${escapeJs(option)}', this.checked)">
                     <span>${escapeHtml(option)}</span>
                 </label>
             `).join('');
         }
 
         function renderLookupControls() {
-            const sheetNames = comparisonState.clientSheetNames;
-            const clientSheet = comparisonState.lookupConfig.clientSheet;
-            const clientHeaders = clientSheet && comparisonState.clientSheets[clientSheet]
-                ? comparisonState.clientSheets[clientSheet].headers
-                : [];
-            document.getElementById('lookupClientSheet').innerHTML = buildSelectOptions(sheetNames, clientSheet, 'Choose client sheet');
-            document.getElementById('lookupClientColumn').innerHTML = buildSelectOptions(clientHeaders, comparisonState.lookupConfig.clientColumn, 'Choose client identifier');
-            document.getElementById('lookupCompareForLazada').checked = Boolean(comparisonState.lookupConfig.compareForLazada);
-            renderChecklist('lookupMasterMatchColumns', comparisonState.masterHeaders, comparisonState.lookupConfig.masterMatchColumns, 'masterMatchColumns');
-            renderChecklist('lookupMasterOutputColumns', comparisonState.masterHeaders, comparisonState.lookupConfig.masterOutputColumns, 'masterOutputColumns');
+            const container = document.getElementById('lookupConfigList');
+            if (!comparisonState.lookupGroups.length) {
+                container.innerHTML = '<div class="preview-row">No lookup groups yet. Add a group or load all client sheets.</div>';
+                return;
+            }
+            container.innerHTML = comparisonState.lookupGroups.map((group, index) => {
+                const clientHeaders = group.clientSheet && comparisonState.clientSheets[group.clientSheet]
+                    ? comparisonState.clientSheets[group.clientSheet].headers
+                    : [];
+                return `
+                    <div class="config-row">
+                        <div class="config-row-head">
+                            <div class="config-row-title">Lookup Group ${index + 1}</div>
+                            <button class="btn btn-subtle" type="button" onclick="removeLookupGroup('${group.id}')">Remove</button>
+                        </div>
+                        <div class="field-grid">
+                            <div class="field">
+                                <label>Client sheet</label>
+                                <select class="select-input" onchange="updateLookupGroup('${group.id}', 'clientSheet', this.value)">${buildSelectOptions(comparisonState.clientSheetNames, group.clientSheet, 'Choose client sheet')}</select>
+                            </div>
+                            <div class="field">
+                                <label>Client identifier column</label>
+                                <select class="select-input" onchange="updateLookupGroup('${group.id}', 'clientColumn', this.value)">${buildSelectOptions(clientHeaders, group.clientColumn, 'Choose client identifier')}</select>
+                            </div>
+                            <div class="field-full">
+                                <label>Master match columns</label>
+                                <div class="checklist-box">${renderLookupChecklist(group.id, comparisonState.masterHeaders, group.masterMatchColumns, 'masterMatchColumns')}</div>
+                            </div>
+                            <div class="field-full">
+                                <div class="toggle-row">
+                                    <span>Compare using <strong>Lazada short Product ID</strong></span>
+                                    <input type="checkbox" ${group.compareForLazada ? 'checked' : ''} onchange="updateLookupGroup('${group.id}', 'compareForLazada', this.checked)">
+                                </div>
+                            </div>
+                            <div class="field-full">
+                                <label>Master columns to append to this client sheet</label>
+                                <div class="checklist-box">${renderLookupChecklist(group.id, comparisonState.masterHeaders, group.masterOutputColumns, 'masterOutputColumns')}</div>
+                            </div>
+                        </div>
+                    </div>`;
+            }).join('');
+        }
+
+        function addLookupGroup(seed = {}) {
+            comparisonState.lookupGroups.push(createLookupGroup({
+                clientSheet: comparisonState.clientSheetNames[0] || '',
+                ...seed
+            }));
+            renderLookupControls();
+        }
+
+        function removeLookupGroup(groupId) {
+            comparisonState.lookupGroups = comparisonState.lookupGroups.filter((group) => group.id !== groupId);
+            renderLookupControls();
+        }
+
+        function addLookupGroupsForAllSheets() {
+            const existingSheets = new Set(comparisonState.lookupGroups.map((group) => group.clientSheet).filter(Boolean));
+            comparisonState.clientSheetNames.forEach((sheetName) => {
+                if (existingSheets.has(sheetName)) return;
+                comparisonState.lookupGroups.push(createLookupGroup({ clientSheet: sheetName }));
+            });
+            renderLookupControls();
         }
 
         function createComparisonGroup(seed = {}) {
@@ -3429,18 +3479,20 @@
                 comparisonState.clientRows = allClientRows;
                 comparisonState.retailerOptions = Object.keys(getRetailerMapFromHeaders(masterProcessed.headers)).sort((a, b) => a.localeCompare(b));
                 comparisonState.lastResult = null;
-                comparisonState.lookupConfig = {
-                    clientSheet: comparisonState.lookupConfig.clientSheet && clientSheets[comparisonState.lookupConfig.clientSheet]
-                        ? comparisonState.lookupConfig.clientSheet
-                        : (clientSheetNames[0] || ''),
-                    clientColumn: '',
-                    masterMatchColumns: new Set(),
-                    masterOutputColumns: new Set(
-                        masterProcessed.headers.filter((header) => String(header).trim().toLowerCase() === 'profitero url').slice(0, 1)
-                    ),
-                    compareForLazada: false
-                };
-                applyLookupDefaultsForSheet(comparisonState.lookupConfig.clientSheet);
+                if (!comparisonState.lookupGroups.length) {
+                    comparisonState.lookupGroups = [createLookupGroup({ clientSheet: clientSheetNames[0] || '' })];
+                } else {
+                    comparisonState.lookupGroups = comparisonState.lookupGroups.map((existingGroup) => {
+                        const clientSheet = existingGroup.clientSheet && clientSheets[existingGroup.clientSheet]
+                            ? existingGroup.clientSheet
+                            : (clientSheetNames[0] || '');
+                        const group = createLookupGroup({ ...existingGroup, clientSheet });
+                        if (!clientSheets[clientSheet]?.headers.includes(group.clientColumn)) {
+                            applyLookupDefaultsToGroup(group, clientSheet);
+                        }
+                        return group;
+                    });
+                }
 
                 if (!comparisonState.groups.length) {
                     comparisonState.groups = [createComparisonGroup({ clientSheet: clientSheetNames[0] || '' })];
@@ -4309,89 +4361,104 @@
             return compareForLazada ? (normalized.split('_')[0] || normalized) : normalized;
         }
 
-        function buildMasterLookupResult() {
-            if (!comparisonState.masterRows.length || !comparisonState.clientRows.length) {
-                throw new Error('Please load both master and client files first');
-            }
+        function getUniqueLookupOutputHeader(sourceColumn, usedHeaders) {
+            if (!usedHeaders.has(sourceColumn)) return sourceColumn;
+            const baseHeader = `Master ${sourceColumn}`;
+            if (!usedHeaders.has(baseHeader)) return baseHeader;
+            let suffix = 2;
+            while (usedHeaders.has(`${baseHeader} (${suffix})`)) suffix += 1;
+            return `${baseHeader} (${suffix})`;
+        }
 
-            const config = comparisonState.lookupConfig;
-            if (!config.clientSheet || !config.clientColumn) {
-                throw new Error('Please choose a client sheet and client identifier column for lookup');
-            }
-            if (!config.masterMatchColumns.size) {
-                throw new Error('Please choose at least one master match column');
-            }
-            if (!config.masterOutputColumns.size) {
-                throw new Error('Please choose at least one master output column');
-            }
+        function buildMasterLookupGroupResult(group, currentSheet) {
+            const clientSheetConfig = comparisonState.clientSheets[group.clientSheet];
+            if (!clientSheetConfig) throw new Error(`Client sheet "${group.clientSheet}" is not available`);
 
-            const clientSheetConfig = comparisonState.clientSheets[config.clientSheet];
-            if (!clientSheetConfig) {
-                throw new Error('The selected client sheet is not available');
-            }
-
-            const matchColumns = Array.from(config.masterMatchColumns);
-            const outputColumns = Array.from(config.masterOutputColumns);
-            const outputDefinitions = outputColumns.map((column) => ({
-                sourceColumn: column,
-                outputHeader: clientSheetConfig.headers.includes(column) ? `Master ${column}` : column
-            }));
+            const matchColumns = Array.from(group.masterMatchColumns);
+            const outputColumns = Array.from(group.masterOutputColumns);
+            const usedHeaders = new Set(currentSheet.headers);
+            const outputDefinitions = outputColumns.map((sourceColumn) => {
+                const outputHeader = getUniqueLookupOutputHeader(sourceColumn, usedHeaders);
+                usedHeaders.add(outputHeader);
+                return { sourceColumn, outputHeader };
+            });
             const lookupMaps = matchColumns.map((column) => {
                 const map = new Map();
                 comparisonState.masterRows.forEach((row) => {
-                    const identifier = normalizeLookupIdentifier(row[column], config.compareForLazada);
+                    const identifier = normalizeLookupIdentifier(row[column], group.compareForLazada);
                     if (!identifier || map.has(identifier)) return;
                     map.set(identifier, row);
                 });
                 return { column, map };
             });
 
-            const resultRows = clientSheetConfig.rows.map((clientRow) => {
-                const identifier = normalizeLookupIdentifier(clientRow[config.clientColumn], config.compareForLazada);
+            const previewRows = [];
+            const rows = currentSheet.rows.map((clientRow) => {
+                const identifier = normalizeLookupIdentifier(clientRow[group.clientColumn], group.compareForLazada);
                 let matchedRow = null;
                 let matchedColumn = '';
                 if (identifier) {
                     for (const entry of lookupMaps) {
-                        const directMatch = entry.map.get(identifier);
-                        if (directMatch) {
-                            matchedRow = directMatch;
-                            matchedColumn = entry.column;
-                            break;
-                        }
+                        if (!entry.map.has(identifier)) continue;
+                        matchedRow = entry.map.get(identifier);
+                        matchedColumn = entry.column;
+                        break;
                     }
                 }
 
-                const row = {};
-                clientSheetConfig.headers.forEach((header) => {
-                    row[header] = clientRow[header] ?? '';
-                });
+                const row = { ...clientRow };
                 outputDefinitions.forEach(({ sourceColumn, outputHeader }) => {
                     row[outputHeader] = matchedRow ? (matchedRow[sourceColumn] ?? '') : '';
                 });
-                row.__lookupStatus = matchedRow ? 'Matched' : 'Not Found';
-                row.__lookupMatchedColumn = matchedColumn || '';
-                row.__lookupIdentifier = clientRow[config.clientColumn] ?? '';
+                previewRows.push({
+                    ...row,
+                    'Lookup Status': matchedRow ? 'Matched' : 'Not Found',
+                    'Matched Master Column': matchedColumn
+                });
                 return row;
             });
-
-            const headers = [
-                ...clientSheetConfig.headers,
-                ...outputDefinitions.map(({ outputHeader }) => outputHeader)
-            ];
-
-            const counts = resultRows.reduce((acc, row) => {
-                acc[row.__lookupStatus] = (acc[row.__lookupStatus] || 0) + 1;
+            const counts = previewRows.reduce((acc, row) => {
+                acc[row['Lookup Status']] = (acc[row['Lookup Status']] || 0) + 1;
                 return acc;
             }, {});
 
             return {
-                clientSheet: config.clientSheet,
-                headers,
-                rows: resultRows,
+                groupId: group.id,
+                clientSheet: group.clientSheet,
+                clientColumn: group.clientColumn,
+                headers: [...currentSheet.headers, ...outputDefinitions.map(({ outputHeader }) => outputHeader)],
+                rows,
+                previewRows,
                 counts,
                 outputDefinitions,
-                compareForLazada: Boolean(config.compareForLazada)
+                compareForLazada: Boolean(group.compareForLazada)
             };
+        }
+
+        function buildMasterLookupResult() {
+            if (!comparisonState.masterRows.length || !comparisonState.clientRows.length) {
+                throw new Error('Please load both master and client files first');
+            }
+            const validGroups = comparisonState.lookupGroups.filter((group) =>
+                group.clientSheet && group.clientColumn && group.masterMatchColumns.size && group.masterOutputColumns.size
+            );
+            if (!validGroups.length) throw new Error('Configure at least one complete lookup group');
+
+            const sheetResults = {};
+            comparisonState.clientSheetNames.forEach((sheetName) => {
+                const sheet = comparisonState.clientSheets[sheetName];
+                sheetResults[sheetName] = {
+                    headers: [...sheet.headers],
+                    rows: sheet.rows.map((row) => ({ ...row }))
+                };
+            });
+            const groupResults = [];
+            validGroups.forEach((group) => {
+                const groupResult = buildMasterLookupGroupResult(group, sheetResults[group.clientSheet]);
+                sheetResults[group.clientSheet] = { headers: groupResult.headers, rows: groupResult.rows };
+                groupResults.push(groupResult);
+            });
+            return { validGroups, sheetResults, groupResults };
         }
 
         async function processMasterLookup() {
@@ -4401,17 +4468,16 @@
                 const result = buildMasterLookupResult();
                 const workbookOut = XLSX.utils.book_new();
                 comparisonState.clientSheetNames.forEach((sheetName) => {
-                    const sheetConfig = comparisonState.clientSheets[sheetName];
-                    const isSelectedSheet = sheetName === result.clientSheet;
-                    const headers = isSelectedSheet ? result.headers : sheetConfig.headers;
-                    const rows = isSelectedSheet ? result.rows : sheetConfig.rows;
+                    const { headers, rows } = result.sheetResults[sheetName];
                     const matrix = [headers, ...rows.map((row) => headers.map((header) => row[header] !== undefined ? row[header] : ''))];
                     const worksheetOut = XLSX.utils.aoa_to_sheet(matrix);
                     applySheetStyles(worksheetOut, matrix);
                     XLSX.utils.book_append_sheet(workbookOut, worksheetOut, sheetName.substring(0, 31));
                 });
                 XLSX.writeFile(workbookOut, 'client_file_enriched.xlsx');
-                showStatus(status, `Client workbook export complete. ${result.outputDefinitions.length} master column(s) appended to ${escapeHtml(result.clientSheet)}. Matched: ${result.counts['Matched'] || 0}. Not Found: ${result.counts['Not Found'] || 0}.`, 'success');
+                const totalMatched = result.groupResults.reduce((sum, group) => sum + (group.counts['Matched'] || 0), 0);
+                const totalNotFound = result.groupResults.reduce((sum, group) => sum + (group.counts['Not Found'] || 0), 0);
+                showStatus(status, `Client workbook export complete. ${result.groupResults.length} lookup group(s) applied. Matched: ${totalMatched}. Not Found: ${totalNotFound}.`, 'success');
             } catch (error) {
                 showStatus(status, `Error: ${error.message}`, 'error');
             }
@@ -4421,18 +4487,19 @@
             const preview = document.getElementById('previewComparison');
             try {
                 const result = buildMasterLookupResult();
-                const previewHeaders = [
-                    'Lookup Status',
-                    comparisonState.lookupConfig.clientColumn,
-                    ...result.outputDefinitions.map(({ outputHeader }) => outputHeader),
-                    'Matched Master Column'
-                ];
-                const previewRows = result.rows.map((row) => ({
-                    ...row,
-                    'Lookup Status': row.__lookupStatus,
-                    'Matched Master Column': row.__lookupMatchedColumn
+                const summaryRows = result.groupResults.map((group, index) => ({
+                    'Group': index + 1,
+                    'Client Sheet': group.clientSheet,
+                    'Mode': group.compareForLazada ? 'Lazada short Product ID' : 'Standard',
+                    'Matched': group.counts['Matched'] || 0,
+                    'Not Found': group.counts['Not Found'] || 0,
+                    'Appended Columns': group.outputDefinitions.map(({ outputHeader }) => outputHeader).join(', ')
                 }));
-                showPreview(preview, `<div class="preview-title">Master lookup preview</div><div class="preview-row">Sheet: ${escapeHtml(result.clientSheet)} | Mode: ${result.compareForLazada ? 'Lazada short Product ID' : 'Standard'} | Matched: ${result.counts['Matched'] || 0} | Not Found: ${result.counts['Not Found'] || 0}</div>${renderPreviewTable('Client rows with appended master values', previewHeaders, previewRows)}`);
+                const groupTables = result.groupResults.map((group, index) => {
+                    const previewHeaders = ['Lookup Status', group.clientColumn, ...group.outputDefinitions.map(({ outputHeader }) => outputHeader), 'Matched Master Column'];
+                    return renderPreviewTable(`Lookup Group ${index + 1}: ${group.clientSheet}`, previewHeaders, group.previewRows);
+                }).join('');
+                showPreview(preview, `<div class="preview-title">Master lookup preview</div>${renderPreviewTable('Group Summary', ['Group', 'Client Sheet', 'Mode', 'Matched', 'Not Found', 'Appended Columns'], summaryRows)}${groupTables}`);
             } catch (error) {
                 showPreview(preview, `<div class="preview-title">Master lookup error</div><div class="preview-row">${escapeHtml(error.message)}</div>`);
             }
